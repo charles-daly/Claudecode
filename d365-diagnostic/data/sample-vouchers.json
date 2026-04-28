@@ -1,0 +1,25 @@
+{
+  "Journal Entries": {
+    "entries": [
+      { "voucher": "LR-2024-001", "date": "2024-01-01", "account": "2319", "description": "ROU Asset – Office Building (IFRS 16)", "debit": 120000, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LR-2024-001", "date": "2024-01-01", "account": "1681", "description": "Lease Liability – Office Building", "debit": 0, "credit": 120000, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LA-2024-002", "date": "2024-01-31", "account": "661",  "description": "Lease Interest Jan [WRONG ACCOUNT]", "debit": 800, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LA-2024-002", "date": "2024-01-31", "account": "1688", "description": "Interest Payable – Lease", "debit": 0, "credit": 800, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LD-2024-003", "date": "2024-01-31", "account": "6811", "description": "ROU Depreciation – Jan", "debit": 2000, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LD-2024-003", "date": "2024-01-31", "account": "2818", "description": "Accumulated Depreciation – ROU", "debit": 0, "credit": 2000, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LP-2024-004", "date": "2024-01-31", "account": "1681", "description": "Lease Payment – Principal", "debit": 1200, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LP-2024-004", "date": "2024-01-31", "account": "512",  "description": "Bank [UNBALANCED]", "debit": 0, "credit": 2000, "currency": "EUR", "module": "Lease" },
+      { "voucher": "FA-2024-005", "date": "2024-02-01", "account": "2154", "description": "Equipment – CNC Machine", "debit": 50000, "credit": 0, "currency": "EUR", "module": "FixedAssets" },
+      { "voucher": "FA-2024-005", "date": "2024-02-01", "account": "401",  "description": "Supplier Payable [WRONG – should be 404]", "debit": 0, "credit": 50000, "currency": "EUR", "module": "FixedAssets" },
+      { "voucher": "FD-2024-006", "date": "2024-02-28", "account": "6811", "description": "Equipment Depreciation – Feb", "debit": 833.33, "credit": 0, "currency": "EUR", "module": "FixedAssets" },
+      { "voucher": "FD-2024-006", "date": "2024-02-28", "account": "28154","description": "Accumulated Depreciation – Equipment", "debit": 0, "credit": 833.33, "currency": "EUR", "module": "FixedAssets" },
+      { "voucher": "LP-2024-009", "date": "2024-02-28", "account": "1681", "description": "Lease Liability – Principal Repayment", "debit": 1200, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LP-2024-009", "date": "2024-02-28", "account": "1688", "description": "Interest Payable – Settlement", "debit": 800, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LP-2024-009", "date": "2024-02-28", "account": "512",  "description": "Bank – Lease Payment", "debit": 0, "credit": 2000, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LA-2024-011", "date": "2024-02-28", "account": "6618", "description": "Lease Interest – Feb (correct)", "debit": 780, "credit": 0, "currency": "EUR", "module": "Lease" },
+      { "voucher": "LA-2024-011", "date": "2024-02-28", "account": "1688", "description": "Interest Payable – Lease", "debit": 0, "credit": 780, "currency": "EUR", "module": "Lease" }
+    ],
+    "vouchers": {},
+    "stats": { "totalEntries": 17, "uniqueVouchers": 8 }
+  }
+}

@@ -1,0 +1,56 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+  background: #0f1117;
+  color: #e2e8f0;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1e293b; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+button { cursor: pointer; font-family: inherit; }
+input, select, textarea { font-family: inherit; }
+
+.badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px;
+}
+.badge-critical { background: #7f1d1d; color: #fca5a5; }
+.badge-high     { background: #7c2d12; color: #fdba74; }
+.badge-medium   { background: #713f12; color: #fcd34d; }
+.badge-clean    { background: #14532d; color: #86efac; }
+.badge-error    { background: #7c2d12; color: #fdba74; }
+.badge-warning  { background: #713f12; color: #fcd34d; }
+
+.card {
+  background: #1a1f2e;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: #64748b; margin-bottom: 14px;
+}
+
+table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data-table thead th {
+  background: #0d1219; color: #94a3b8; font-weight: 600;
+  padding: 8px 12px; text-align: left; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid #1e293b;
+  white-space: nowrap;
+}
+table.data-table tbody tr { border-bottom: 1px solid #1e293b; transition: background .1s; }
+table.data-table tbody tr:hover { background: #1e2433; }
+table.data-table tbody td { padding: 8px 12px; color: #cbd5e1; }
+table.data-table .amount { text-align: right; font-variant-numeric: tabular-nums; font-family: 'Consolas', monospace; }
