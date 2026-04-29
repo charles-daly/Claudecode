@@ -4,6 +4,7 @@ const { ROOT_CAUSES, COMMON_ACCOUNT_ERRORS, getAccountName } = require('./accoun
 const { analyseVoucher } = require('./voucherAnalyzer');
 const { resolveAccountSource, resolveAccountPair } = require('./accountSourceResolver');
 const { moduleLoader } = require('./moduleLoader');
+const { analyseAccrualScenario } = require('./accrualEngine');
 
 /**
  * Master diagnostic runner.
@@ -163,6 +164,13 @@ function analyseScenario(scenario, context, idx) {
     }
   }
 
+  // ── Accrual / Auto-Reversal check (Project Group) ─────────────────────────
+  let accrualAnalysis = null;
+  if (context.projectGroup?.accrualEnabled) {
+    accrualAnalysis = analyseAccrualScenario(scenario, context);
+    accrualAnalysis.issues.forEach(ai => issues.push(ai));
+  }
+
   const status =
     issues.length === 0                         ? 'clean'    :
     issues.some(i => i.severity === 'critical') ? 'critical' :
@@ -172,6 +180,7 @@ function analyseScenario(scenario, context, idx) {
     id: idx + 1, description, transactionType: txKey,
     expectedEntries, actualEntries, issues,
     d365Drivers: buildD365Drivers(issues, context, txKey),
+    accrualAnalysis,
     status,
   };
 }
@@ -252,6 +261,25 @@ function buildD365Drivers(issues, context, transactionType) {
         add({ driver: 'FrenchRegulatoryParameters',
               path: issue.expectedSource?.d365Path || 'Fixed Assets ▸ Setup ▸ Fixed Asset Parameters ▸ French Regulatory',
               action: 'Enable PMA and configure posting accounts', priority: 'medium' });
+        break;
+      case 'ACCRUAL_REVERSAL_MISSING':
+        add({ driver: 'ProjectGroup',
+              path: issue.rootCause?.d365Path || 'Project Management and Accounting ▸ Setup ▸ Project Groups',
+              action: issue.rootCause?.action || 'Configure Reversal principle in Project Group Estimates tab and verify Accruals batch job.',
+              priority: 'critical' });
+        break;
+      case 'MISSING_REVERSAL_LINE':
+      case 'WRONG_BS_ACCOUNT':
+        add({ driver: issue.rootCause?.driver || 'ProjectPostingProfile',
+              path: issue.rootCause?.d365Path || 'Project Management and Accounting ▸ Setup ▸ Posting ▸ Posting',
+              action: issue.rootCause?.action || 'Update accrual BS account in Project Posting Profile.',
+              priority: 'high' });
+        break;
+      case 'PL_NOT_NEUTRALIZED':
+        add({ driver: 'ProjectGroup',
+              path: issue.rootCause?.d365Path || 'Project Management and Accounting ▸ Setup ▸ Project Groups',
+              action: issue.rootCause?.action || 'Verify reversal principle and re-run the Accruals batch job for affected periods.',
+              priority: 'high' });
         break;
     }
   });

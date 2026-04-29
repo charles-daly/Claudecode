@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 
 const TX_TYPES = {
   pma: [
-    { value: 'Expense', label: 'Project Expense' },
-    { value: 'Revenue', label: 'Project Revenue' },
-    { value: 'WIP',     label: 'Work-In-Progress (WIP)' },
+    { value: 'Expense',        label: 'Project Expense' },
+    { value: 'Revenue',        label: 'Project Revenue' },
+    { value: 'WIP',            label: 'Work-In-Progress (WIP)' },
+    { value: 'CostAccrual',    label: 'Cost Accrual (Auto-Reversal)' },
+    { value: 'RevenueAccrual', label: 'Revenue Accrual (Auto-Reversal)' },
   ],
   procurement: [
     { value: 'Invoice',       label: 'Vendor Invoice' },
@@ -179,7 +181,7 @@ function EntryTable({ title, accent, entries, onChange }) {
 
 function EmptyState({ onAdd, module }) {
   const examples = {
-    pma:            'Project expense charge or WIP recognition',
+    pma:            'Project expense, WIP recognition, or cost accrual with auto-reversal',
     procurement:    'Vendor invoice or receipt accrual',
     sales:          'Customer invoice or revenue recognition',
     fixed_assets:   'Asset acquisition or depreciation',

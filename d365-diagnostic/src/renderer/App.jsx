@@ -8,12 +8,17 @@ import DiagnosticResults from './components/DiagnosticResults';
 import VoucherAnalysis from './components/VoucherAnalysis';
 import ExportPanel from './components/ExportPanel';
 
-const DEFAULT_CONTEXT = { module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false };
+const DEFAULT_CONTEXT = {
+  module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false,
+  projectGroup: { accrualEnabled: false, autoReverse: false },
+};
 
 // ─── Built-in sample scenarios ────────────────────────────────────────────────
 const SAMPLE_SCENARIOS = {
   pma: {
-    context: { module: 'pma', country: 'FR', gaap: 'french_gaap', pma: false },
+    context: { module: 'pma', country: 'FR', gaap: 'french_gaap', pma: false,
+      projectGroup: { accrualEnabled: false, autoReverse: false },
+    },
     scenarios: [
       {
         id: 1,
@@ -58,7 +63,9 @@ const SAMPLE_SCENARIOS = {
   },
 
   procurement: {
-    context: { module: 'procurement', country: 'FR', gaap: 'french_gaap', pma: false },
+    context: { module: 'procurement', country: 'FR', gaap: 'french_gaap', pma: false,
+      projectGroup: { accrualEnabled: false, autoReverse: false },
+    },
     scenarios: [
       {
         id: 1,
@@ -102,8 +109,68 @@ const SAMPLE_SCENARIOS = {
     ],
   },
 
+  pmaAccrual: {
+    context: {
+      module: 'pma', country: 'FR', gaap: 'french_gaap', pma: false,
+      projectGroup: { accrualEnabled: true, autoReverse: true },
+    },
+    scenarios: [
+      {
+        id: 1,
+        description: 'Accrual — Correct cost accrual with auto-reversal (clean)',
+        transactionType: 'CostAccrual',
+        expectedEntries: [
+          { account: '6180',  description: 'Project cost accrual (P&L forward)',    debit: 25000, credit: 0     },
+          { account: '4871',  description: 'Accrued project costs (BS forward)',     debit: 0,     credit: 25000 },
+          { account: '4871',  description: 'Accrued project costs (BS reversal)',    debit: 25000, credit: 0     },
+          { account: '6180',  description: 'Project cost accrual (P&L reversal)',    debit: 0,     credit: 25000 },
+        ],
+        actualEntries: [
+          { account: '6180',  description: 'Project cost accrual (P&L forward)',    debit: 25000, credit: 0     },
+          { account: '4871',  description: 'Accrued project costs (BS forward)',     debit: 0,     credit: 25000 },
+          { account: '4871',  description: 'Accrued project costs (BS reversal)',    debit: 25000, credit: 0     },
+          { account: '6180',  description: 'Project cost accrual (P&L reversal)',    debit: 0,     credit: 25000 },
+        ],
+      },
+      {
+        id: 2,
+        description: 'Accrual — Wrong BS account (52000 used instead of 4871)',
+        transactionType: 'CostAccrual',
+        expectedEntries: [
+          { account: '6180',  description: 'Project cost accrual (P&L forward)',    debit: 30000, credit: 0     },
+          { account: '4871',  description: 'Accrued project costs (BS forward)',     debit: 0,     credit: 30000 },
+          { account: '4871',  description: 'Reversal — BS account',                  debit: 30000, credit: 0     },
+          { account: '6180',  description: 'Reversal — P&L account',                 debit: 0,     credit: 30000 },
+        ],
+        actualEntries: [
+          { account: '6180',  description: 'Project cost accrual (P&L forward)',    debit: 30000, credit: 0     },
+          { account: '52000', description: 'Other financial account (wrong BS)',     debit: 0,     credit: 30000 },
+          { account: '52000', description: 'Reversal — wrong BS account',            debit: 30000, credit: 0     },
+          { account: '6180',  description: 'Reversal — P&L account',                 debit: 0,     credit: 30000 },
+        ],
+      },
+      {
+        id: 3,
+        description: 'Accrual — Missing auto-reversal (only forward entries posted)',
+        transactionType: 'CostAccrual',
+        expectedEntries: [
+          { account: '6220',  description: 'External services accrual (P&L forward)', debit: 18000, credit: 0     },
+          { account: '4871',  description: 'Accrued costs (BS forward)',               debit: 0,     credit: 18000 },
+          { account: '4871',  description: 'Reversal — BS account',                    debit: 18000, credit: 0     },
+          { account: '6220',  description: 'Reversal — P&L account',                   debit: 0,     credit: 18000 },
+        ],
+        actualEntries: [
+          { account: '6220',  description: 'External services accrual (P&L forward)', debit: 18000, credit: 0     },
+          { account: '4871',  description: 'Accrued costs (BS forward)',               debit: 0,     credit: 18000 },
+        ],
+      },
+    ],
+  },
+
   sales: {
-    context: { module: 'sales', country: 'FR', gaap: 'french_gaap', pma: false },
+    context: { module: 'sales', country: 'FR', gaap: 'french_gaap', pma: false,
+      projectGroup: { accrualEnabled: false, autoReverse: false },
+    },
     scenarios: [
       {
         id: 1,
@@ -231,9 +298,10 @@ export default function App() {
         {/* Sample loaders */}
         <div style={{ display: 'flex', gap: 6 }}>
           {[
-            { key: 'pma',         label: 'PMA Sample',         color: '#8b5cf6' },
-            { key: 'procurement', label: 'Procurement Sample',  color: '#f59e0b' },
-            { key: 'sales',       label: 'Sales Sample',        color: '#22c55e' },
+            { key: 'pma',         label: 'PMA Sample',          color: '#8b5cf6' },
+            { key: 'procurement', label: 'Procurement Sample',   color: '#f59e0b' },
+            { key: 'sales',       label: 'Sales Sample',         color: '#22c55e' },
+            { key: 'pmaAccrual',  label: 'Accrual Sample',       color: '#6366f1' },
           ].map(s => (
             <button
               key={s.key}
@@ -273,6 +341,8 @@ function SamplePanel({ onLoad }) {
       desc: '3 scenarios: invoice with wrong AP (408 instead of 401), correct receipt accrual, FA invoice using trade payable instead of 404.' },
     { key: 'sales',       title: 'Sales (Order-to-Cash)',                 color: '#22c55e',
       desc: '3 scenarios: invoice deferred unintentionally, COGS using purchase accounts, correct revenue recognition release.' },
+    { key: 'pmaAccrual',  title: 'PMA — Accrual / Auto-Reversal Engine',  color: '#6366f1',
+      desc: '3 scenarios with Project Group accrual enabled: correct auto-reversal (clean), wrong BS account (4871 → 52000), and missing reversal (only forward entries posted). Activates deep accrual pattern diagnostics.' },
   ];
   return (
     <div>

@@ -169,6 +169,36 @@
     }
   },
 
+  "ProjectGroup": {
+    "applicableModules": ["pma"],
+    "description": "Project Group controls accrual principle, reversal timing, WIP recognition method, cost method, and revenue method for all projects within the group. Misconfiguration here causes systematic accrual posting errors across every project assigned to the group. This is the root configuration driver for all accrual and auto-reversal diagnostic findings.",
+    "d365Path": "Project Management and Accounting ▸ Setup ▸ Project Groups",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Accrual Principle": {
+        "description": "Determines whether project costs and revenues are accrued before final recognition. Options: None, Production, Profit-and-loss.",
+        "accountPrefixes": { "FR": [], "US": [] },
+        "canonicalPrefixes": { "FR": [], "US": [] }
+      },
+      "Reversal Principle": {
+        "description": "Controls when auto-reversal entries are posted: As per transaction date (same voucher) or As per period start date (next period opening).",
+        "accountPrefixes": { "FR": [], "US": [] },
+        "canonicalPrefixes": { "FR": [], "US": [] }
+      },
+      "Cost Method": {
+        "description": "Defines how project costs are recognized: No WIP, Completed contract, or Percentage completion.",
+        "accountPrefixes": { "FR": [], "US": [] },
+        "canonicalPrefixes": { "FR": [], "US": [] }
+      },
+      "Revenue Method": {
+        "description": "Defines how project revenues are recognized: No WIP, Completed contract, Percentage completion, or Accrued revenue.",
+        "accountPrefixes": { "FR": [], "US": [] },
+        "canonicalPrefixes": { "FR": [], "US": [] }
+      }
+    }
+  },
+
   "LedgerMapping": {
     "applicableModules": ["pma"],
     "description": "Chart of accounts main account — the fallback source. When no module-specific posting profile matches, the entry likely originated from a manual GL journal bypassing PMA module logic.",

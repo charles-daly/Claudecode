@@ -47,5 +47,59 @@
     "knownErrors": {
       "35": { "shouldBe": ["34"], "detail": "Finished goods account (35x) used for WIP — check project category determines WIP vs. finished-goods classification." }
     }
+  },
+
+  "CostAccrual": {
+    "label": "Project Cost Accrual (Auto-Reversal)",
+    "description": "Project Group cost accrual with automatic reversal. D365 posts a forward entry (DR P&L / CR BS accrual account) and an immediate or period-start reversal (DR BS / CR P&L) to neutralize the P&L impact. The BS accrual account acts as a transitory holding account.",
+    "detection": {
+      "debitPrefixes":  ["60","61","62","63","64","65"],
+      "creditPrefixes": ["48","487","4871"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["618","6180","6185","621","622","625","641","601","602","604"], "label": "Project Cost — P&L account (forward accrual)" },
+      { "gaap": "all", "side": "credit", "accounts": ["4871","4872","487"],                                           "label": "Accrued cost — BS holding account (forward accrual)" },
+      { "gaap": "all", "side": "debit",  "accounts": ["4871","4872","487"],                                           "label": "Accrued cost — BS holding account (auto-reversal)" },
+      { "gaap": "all", "side": "credit", "accounts": ["618","6180","6185","621","622","625","641","601","602","604"], "label": "Project Cost — P&L account (auto-reversal)" }
+    ],
+    "knownErrors": {
+      "52000": {
+        "shouldBe": ["4871","487"],
+        "detail": "Miscellaneous financial account (52000) used as BS accrual account instead of dedicated project accrual account (4871/487). The Project Posting Profile 'Accrued cost' field is incorrectly configured."
+      },
+      "401": {
+        "shouldBe": ["4871","487"],
+        "detail": "Trade payable account (401) used for project cost accrual instead of a dedicated BS accrual account. Trade payable is reserved for vendor invoice postings, not for Project Group accruals."
+      },
+      "486": {
+        "shouldBe": ["4871","487"],
+        "detail": "Prepaid expense account (486) used as accrual BS account instead of 487/4871. The accrual is a liability (charge à payer), not a prepayment."
+      }
+    }
+  },
+
+  "RevenueAccrual": {
+    "label": "Project Revenue Accrual (Auto-Reversal)",
+    "description": "Project Group revenue accrual with automatic reversal. D365 posts a forward revenue accrual (DR BS / CR Revenue) and an immediate reversal (DR Revenue / CR BS) when the Project Group accrual principle is active. Net P&L effect is zero; revenue is recognized only on final billing.",
+    "detection": {
+      "debitPrefixes":  ["418","4181","487"],
+      "creditPrefixes": ["70","706","708","71"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["418","4181","4871","4872"],   "label": "Accrued revenue — BS holding account (forward accrual)" },
+      { "gaap": "all", "side": "credit", "accounts": ["706","701","708","71"],        "label": "Revenue — P&L account (forward accrual)" },
+      { "gaap": "all", "side": "debit",  "accounts": ["706","701","708","71"],        "label": "Revenue — P&L account (auto-reversal)" },
+      { "gaap": "all", "side": "credit", "accounts": ["418","4181","4871","4872"],   "label": "Accrued revenue — BS holding account (auto-reversal)" }
+    ],
+    "knownErrors": {
+      "411": {
+        "shouldBe": ["418","4871"],
+        "detail": "Trade receivables account (411) used as BS accrual account for revenue accrual. This account is reserved for billed invoices. The Project Posting Profile 'Accrued revenue-sales value' field should reference 418 or 4871."
+      },
+      "487": {
+        "shouldBe": ["418","4871"],
+        "detail": "Deferred income account (487) used for revenue accrual instead of the unbilled receivables / accrued revenue account (418/4871). Review project billing and revenue recognition setup."
+      }
+    }
   }
 }

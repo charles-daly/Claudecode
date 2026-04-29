@@ -13,7 +13,14 @@ const MODULES = [
 export default function ContextSelector({ context, setContext }) {
   const set = (key, value) => setContext(prev => ({ ...prev, [key]: value }));
 
+  const setProjectGroup = (key, value) =>
+    setContext(prev => ({
+      ...prev,
+      projectGroup: { ...(prev.projectGroup || {}), [key]: value },
+    }));
+
   const activeModule = MODULES.find(m => m.value === context.module) || MODULES[0];
+  const pg           = context.projectGroup || {};
 
   return (
     <div>
@@ -52,19 +59,16 @@ export default function ContextSelector({ context, setContext }) {
 
         {/* PMA Toggle */}
         <FieldCard title="PMA — Provision pour Mise en Amortissement" icon="🇫🇷" span={2}>
-          <p style={S.pmaDesc}>
+          <p style={S.featureDesc}>
             French regulatory feature requiring a provision entry (68725 DR / 1510 CR) alongside standard depreciation.
             Only applicable under French GAAP with Fixed Assets or Lease modules.
           </p>
-          <label style={S.toggle}>
-            <input type="checkbox" checked={context.pma} onChange={e => set('pma', e.target.checked)} style={{ display: 'none' }} />
-            <div style={{ ...S.toggleTrack, background: context.pma ? '#3b82f6' : '#1e293b' }}>
-              <div style={{ ...S.toggleThumb, left: context.pma ? '22px' : '2px' }} />
-            </div>
-            <span style={{ color: context.pma ? '#3b82f6' : '#64748b', fontWeight: 600 }}>
-              {context.pma ? 'PMA Active' : 'PMA Inactive'}
-            </span>
-          </label>
+          <Toggle
+            checked={context.pma}
+            onChange={v => set('pma', v)}
+            color="#3b82f6"
+            label={context.pma ? 'PMA Active' : 'PMA Inactive'}
+          />
           {context.gaap !== 'french_gaap' && context.pma && (
             <div style={S.warn}>PMA is a French GAAP feature. Set GAAP to French GAAP for full rule coverage.</div>
           )}
@@ -72,6 +76,40 @@ export default function ContextSelector({ context, setContext }) {
             <div style={S.warn}>PMA is only applicable in Fixed Assets and Lease modules.</div>
           )}
         </FieldCard>
+
+        {/* Project Group — Accrual / Auto-Reversal (PMA module only) */}
+        {context.module === 'pma' && (
+          <FieldCard title="Project Group — Accrual / Auto-Reversal" icon="🔄" span={2}>
+            <p style={S.featureDesc}>
+              When Project Group accrual is enabled, D365 posts forward accrual entries (P&L ↔ Balance Sheet)
+              that are automatically reversed in the same voucher or at the start of the next period. Enabling this
+              activates deep pattern detection: entry pair matching, BS account validation against the Project Posting
+              Profile, P&L neutralization verification, and full root-cause tracing for every deviation found.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <Toggle
+                checked={pg.accrualEnabled || false}
+                onChange={v => setProjectGroup('accrualEnabled', v)}
+                color="#8b5cf6"
+                label={pg.accrualEnabled ? 'Accrual Engine Active' : 'Accrual Engine Inactive'}
+              />
+              {pg.accrualEnabled && (
+                <Toggle
+                  checked={pg.autoReverse || false}
+                  onChange={v => setProjectGroup('autoReverse', v)}
+                  color="#6366f1"
+                  label={pg.autoReverse ? 'Auto-Reversal Expected' : 'Auto-Reversal Not Expected'}
+                  sub="Enable when the Project Group Reversal principle is configured. The engine will flag any missing reversal lines as high-severity issues."
+                />
+              )}
+            </div>
+            {pg.accrualEnabled && context.gaap !== 'french_gaap' && (
+              <div style={{ ...S.warn, marginTop: 12 }}>
+                Accrual pattern rules reference French PCG account prefixes (4871, 418, 6xx, 7xx). Set GAAP to French GAAP for complete diagnostic coverage.
+              </div>
+            )}
+          </FieldCard>
+        )}
       </div>
 
       {/* Summary card */}
@@ -83,10 +121,20 @@ export default function ContextSelector({ context, setContext }) {
             ['Country',  context.country],
             ['GAAP',     context.gaap?.replace(/_/g, ' ')?.replace(/\b\w/g, c => c.toUpperCase())],
             ['PMA',      context.pma ? 'Enabled' : 'Disabled'],
+            ...(context.module === 'pma' ? [
+              ['Accrual', pg.accrualEnabled ? 'Enabled' : 'Disabled'],
+              ...(pg.accrualEnabled ? [['Auto-Rev', pg.autoReverse ? 'On' : 'Off']] : []),
+            ] : []),
           ].map(([k, v]) => (
             <div key={k} style={S.summaryItem}>
               <span style={S.summaryKey}>{k}</span>
-              <span style={{ ...S.summaryVal, color: k === 'Module' ? activeModule.color : '#e2e8f0' }}>{v}</span>
+              <span style={{
+                ...S.summaryVal,
+                color: k === 'Module'   ? activeModule.color :
+                       k === 'Accrual'  ? (pg.accrualEnabled ? '#8b5cf6' : '#475569') :
+                       k === 'Auto-Rev' ? (pg.autoReverse    ? '#6366f1' : '#475569') :
+                       '#e2e8f0',
+              }}>{v}</span>
             </div>
           ))}
         </div>
@@ -112,6 +160,21 @@ function FieldCard({ title, icon, children, span = 1 }) {
         <span className="section-title" style={{ marginBottom: 0 }}>{title}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange, color, label, sub }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={S.toggle}>
+        <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ display: 'none' }} />
+        <div style={{ ...S.toggleTrack, background: checked ? color : '#1e293b' }}>
+          <div style={{ ...S.toggleThumb, left: checked ? '22px' : '2px' }} />
+        </div>
+        <span style={{ color: checked ? color : '#64748b', fontWeight: 600 }}>{label}</span>
+      </label>
+      {sub && <p style={{ fontSize: 11, color: '#475569', marginLeft: 54, marginTop: 0 }}>{sub}</p>}
     </div>
   );
 }
@@ -180,12 +243,12 @@ const S = {
     border: '2px solid #334155', background: 'transparent', transition: 'all .15s',
   },
   radioDotActive: { border: '2px solid #3b82f6', background: '#3b82f6' },
-  pmaDesc: { fontSize: 12, color: '#64748b', lineHeight: 1.6, marginBottom: 14 },
+  featureDesc: { fontSize: 12, color: '#64748b', lineHeight: 1.6, marginBottom: 14 },
   toggle: { display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' },
   toggleTrack: { width: 42, height: 22, borderRadius: 999, position: 'relative', transition: 'background .2s', flexShrink: 0 },
   toggleThumb: { position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' },
   warn: {
-    marginTop: 10, padding: '8px 12px', background: '#422006', border: '1px solid #854d0e',
+    padding: '8px 12px', background: '#422006', border: '1px solid #854d0e',
     borderRadius: 6, fontSize: 12, color: '#fcd34d',
   },
   summary: { background: '#0d1219', border: '1px solid #1e293b', borderRadius: 10, padding: '16px 20px' },

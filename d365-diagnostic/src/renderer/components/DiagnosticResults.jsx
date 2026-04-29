@@ -117,9 +117,16 @@ export default function DiagnosticResults({ result, isRunning }) {
                 <span style={{ color: '#475569', fontSize: 11 }}>{expandedScenario === f.id ? '▲' : '▼'}</span>
               </div>
 
-              {expandedScenario === f.id && f.issues.length > 0 && (
+              {expandedScenario === f.id && (
                 <div style={{ padding: '0 12px 12px' }}>
+                  {f.accrualAnalysis && <AccrualPanel analysis={f.accrualAnalysis} />}
                   {f.issues.map((issue, i) => <IssueCard key={i} issue={issue} />)}
+                  {f.issues.length === 0 && !f.accrualAnalysis && (
+                    <div style={{ fontSize: 13, color: '#22c55e', padding: '8px 0' }}>✓ No issues detected</div>
+                  )}
+                  {f.issues.length === 0 && f.accrualAnalysis?.status === 'clean' && (
+                    <div style={{ fontSize: 13, color: '#22c55e', padding: '4px 0' }}>✓ Accrual pattern valid — P&L neutralized, no issues detected</div>
+                  )}
                   {f.d365Drivers?.length > 0 && (
                     <div style={{ marginTop: 10 }}>
                       <div style={S.driversLabel}>D365 Fix Paths</div>
@@ -134,9 +141,6 @@ export default function DiagnosticResults({ result, isRunning }) {
                   )}
                 </div>
               )}
-              {expandedScenario === f.id && f.issues.length === 0 && (
-                <div style={{ padding: '8px 12px 12px', fontSize: 13, color: '#22c55e' }}>✓ No issues detected</div>
-              )}
             </div>
           ))}
         </div>
@@ -146,16 +150,109 @@ export default function DiagnosticResults({ result, isRunning }) {
 }
 
 function IssueCard({ issue }) {
+  const sevColor = SEV_COLOR[issue.severity] || '#475569';
+  const sevBg    = SEV_BG[issue.severity]    || '#1a1f2e';
   return (
-    <div style={{ ...S.issueCard, borderColor: SEV_COLOR[issue.severity] || '#475569', background: SEV_BG[issue.severity] || '#1a1f2e' }}>
+    <div style={{ ...S.issueCard, borderColor: sevColor, background: sevBg }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, background: SEV_COLOR[issue.severity] + '33', color: SEV_COLOR[issue.severity], fontWeight: 700, textTransform: 'uppercase' }}>
+        <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 999, background: sevColor + '33', color: sevColor, fontWeight: 700, textTransform: 'uppercase' }}>
           {issue.severity}
         </span>
         <span style={{ fontWeight: 600, color: '#e2e8f0', fontSize: 13 }}>{issue.title}</span>
       </div>
-      <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: issue.fix ? 4 : 0 }}>{issue.detail}</div>
-      {issue.fix && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>Fix: {issue.fix}</div>}
+      <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>{issue.detail}</div>
+      {issue.fix && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 4 }}>Fix: {issue.fix}</div>}
+
+      {issue.rootCause && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #1e293b22' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: .6, marginBottom: 5 }}>Root Cause</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>
+            <span style={{ color: '#3b82f6', fontWeight: 700 }}>{issue.rootCause.driver}</span>
+            {' → '}
+            <span style={{ color: '#cbd5e1' }}>{issue.rootCause.element}</span>
+          </div>
+          <div style={{ fontSize: 11, color: '#475569', marginBottom: 3 }}>
+            Path: <span style={{ color: '#3b82f6' }}>{issue.rootCause.d365Path}</span>
+          </div>
+          {issue.rootCause.trace && (
+            <div style={{ fontSize: 10, color: '#64748b', fontFamily: 'monospace', whiteSpace: 'pre-line', background: '#0f1117', borderRadius: 4, padding: '6px 8px', marginBottom: 4 }}>
+              {issue.rootCause.trace}
+            </div>
+          )}
+          {issue.rootCause.action && (
+            <div style={{ fontSize: 11, color: '#f59e0b', fontStyle: 'italic' }}>
+              Action: {issue.rootCause.action}
+            </div>
+          )}
+        </div>
+      )}
+
+      {issue.impact && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #1e293b22', fontSize: 11, color: '#f97316' }}>
+          <span style={{ fontWeight: 700, color: '#fbbf24' }}>Business Impact: </span>{issue.impact}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AccrualPanel({ analysis }) {
+  const { accrualDetected, pairCount, plPairs, bsPairs, unmatched, impact, remediation, status } = analysis;
+  const statusColor = status === 'critical' ? '#ef4444' :
+                      status === 'error'    ? '#f97316' :
+                      status === 'clean'    ? '#22c55e' : '#f59e0b';
+
+  const stats = [
+    { label: 'Pairs',     value: pairCount,              color: pairCount > 0 ? '#22c55e' : '#ef4444' },
+    { label: 'P&L Pairs', value: plPairs?.length  || 0,  color: '#94a3b8' },
+    { label: 'BS Pairs',  value: bsPairs?.length  || 0,  color: '#94a3b8' },
+    { label: 'Unmatched', value: unmatched?.length || 0,  color: (unmatched?.length || 0) > 0 ? '#f97316' : '#22c55e' },
+    { label: 'Net P&L',   value: (impact?.plNet || 0).toFixed(2), color: Math.abs(impact?.plNet || 0) > 0.01 ? '#ef4444' : '#22c55e' },
+    { label: 'Net BS',    value: (impact?.bsNet || 0).toFixed(2), color: Math.abs(impact?.bsNet || 0) > 0.01 ? '#f97316' : '#22c55e' },
+  ];
+
+  return (
+    <div style={{ background: '#070b14', border: `1px solid ${statusColor}44`, borderRadius: 8, padding: '12px 14px', marginBottom: 10 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: .8 }}>
+          Accrual / Auto-Reversal Engine
+        </span>
+        <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 999, background: statusColor + '22', color: statusColor, fontWeight: 700, textTransform: 'uppercase' }}>
+          {status}
+        </span>
+        <span style={{ fontSize: 10, color: '#475569', marginLeft: 'auto' }}>
+          {accrualDetected ? `${pairCount} pair${pairCount !== 1 ? 's' : ''} detected` : 'No pairs detected'}
+        </span>
+      </div>
+
+      {/* Metrics row */}
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: remediation ? 12 : 0, paddingBottom: remediation ? 12 : 0, borderBottom: remediation ? '1px solid #1e293b' : 'none' }}>
+        {stats.map(({ label, value, color }) => (
+          <div key={label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 64 }}>
+            <span style={{ fontSize: 18, fontWeight: 700, color, lineHeight: 1 }}>{value}</span>
+            <span style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>{label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Remediation steps */}
+      {remediation && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: .6, marginBottom: 6 }}>
+            Remediation — {remediation.primaryPath}
+          </div>
+          {remediation.steps.map(step => (
+            <div key={step.step} style={{ fontSize: 11, color: '#94a3b8', marginBottom: 5 }}>
+              <span style={{ color: '#8b5cf6', fontWeight: 700 }}>Step {step.step}:</span>{' '}
+              <span style={{ color: '#cbd5e1' }}>{step.title}</span>
+              {step.d365Path && (
+                <div style={{ fontSize: 10, color: '#3b82f6', marginLeft: 14, marginTop: 1 }}>→ {step.d365Path}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
