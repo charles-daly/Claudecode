@@ -1,12 +1,13 @@
 import React from 'react';
 
 const TABS = [
-  { id: 'context',   icon: '⚙', label: 'Context',   sub: 'Module & GAAP' },
-  { id: 'scenarios', icon: '📋', label: 'Scenarios',  sub: 'Expected vs Actual' },
-  { id: 'import',    icon: '📥', label: 'Import',     sub: 'Excel Vouchers' },
-  { id: 'results',   icon: '🔍', label: 'Diagnostic', sub: 'Results & Findings', requiresResult: true },
-  { id: 'vouchers',  icon: '📊', label: 'Vouchers',   sub: 'Drill-down', requiresResult: true },
-  { id: 'export',    icon: '📤', label: 'Export',     sub: 'Excel / Word', requiresResult: true },
+  { id: 'context',   icon: '⚙', label: 'Context',      sub: 'Module & GAAP' },
+  { id: 'scenarios', icon: '📋', label: 'Scenarios',    sub: 'Expected vs Actual' },
+  { id: 'import',    icon: '📥', label: 'Import',       sub: 'Excel Vouchers' },
+  { id: 'gaap',      icon: '🗂', label: 'GAAP Mapping', sub: 'US ↔ FR Accounts' },
+  { id: 'results',   icon: '🔍', label: 'Diagnostic',   sub: 'Results & Findings', requiresResult: true },
+  { id: 'vouchers',  icon: '📊', label: 'Vouchers',     sub: 'Drill-down', requiresResult: true },
+  { id: 'export',    icon: '📤', label: 'Export',       sub: 'Excel / Word', requiresResult: true },
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, hasResult }) {

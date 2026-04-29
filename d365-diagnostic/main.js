@@ -137,6 +137,43 @@ ipcMain.handle('shell:showFile', async (_event, filePath) => {
   return { success: true };
 });
 
+// ─── IPC: GAAP Mapping CRUD ───────────────────────────────────
+ipcMain.handle('gaap:getAll', async () => {
+  try {
+    const { getAllMappings } = require('./src/engine/gaapMappingEngine');
+    return { success: true, mappings: getAllMappings() };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('gaap:add', async (_event, mapping) => {
+  try {
+    const { addMapping } = require('./src/engine/gaapMappingEngine');
+    return addMapping(mapping);
+  } catch (err) {
+    return { success: false, errors: [err.message] };
+  }
+});
+
+ipcMain.handle('gaap:update', async (_event, id, updates) => {
+  try {
+    const { updateMapping } = require('./src/engine/gaapMappingEngine');
+    return updateMapping(id, updates);
+  } catch (err) {
+    return { success: false, errors: [err.message] };
+  }
+});
+
+ipcMain.handle('gaap:delete', async (_event, id) => {
+  try {
+    const { deleteMapping } = require('./src/engine/gaapMappingEngine');
+    return deleteMapping(id);
+  } catch (err) {
+    return { success: false, errors: [err.message] };
+  }
+});
+
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "lastUpdated": "2026-04-29",
+    "description": "US GAAP to French GAAP (PCG) account mapping table"
+  },
+  "mappings": [
+    { "id": "m001", "usAccount": "52000",  "frAccount": "641",  "type": "Cost",                    "description": "Salaries & wages expense",                   "module": "pma" },
+    { "id": "m002", "usAccount": "550000", "frAccount": "622",  "type": "Cost",                    "description": "Professional services / subcontracting",     "module": "pma" },
+    { "id": "m003", "usAccount": "400100", "frAccount": "706",  "type": "Revenue",                 "description": "Service revenue",                           "module": "pma" },
+    { "id": "m004", "usAccount": "400200", "frAccount": "701",  "type": "Revenue",                 "description": "Product sales revenue",                     "module": "sales" },
+    { "id": "m005", "usAccount": "500100", "frAccount": "607",  "type": "COGS",                    "description": "Cost of goods sold",                        "module": "sales" },
+    { "id": "m006", "usAccount": "110000", "frAccount": "411",  "type": "Receivable",              "description": "Trade accounts receivable",                 "module": "sales" },
+    { "id": "m007", "usAccount": "200000", "frAccount": "401",  "type": "Payable",                 "description": "Trade accounts payable",                    "module": "procurement" },
+    { "id": "m008", "usAccount": "205000", "frAccount": "408",  "type": "Accrual",                 "description": "Accrued liabilities / uninvoiced receipts", "module": "procurement" },
+    { "id": "m009", "usAccount": "510000", "frAccount": "6811", "type": "Depreciation",            "description": "Depreciation expense — fixed assets",       "module": "fixed_assets" },
+    { "id": "m010", "usAccount": "159000", "frAccount": "2818", "type": "Accumulated Depreciation","description": "Accumulated depreciation — assets",         "module": "fixed_assets" },
+    { "id": "m011", "usAccount": "600100", "frAccount": "6618", "type": "Interest",                "description": "Finance lease interest expense",            "module": "lease" },
+    { "id": "m012", "usAccount": "210000", "frAccount": "1681", "type": "Liability",               "description": "Finance lease liability",                   "module": "lease" },
+    { "id": "m013", "usAccount": "152000", "frAccount": "2319", "type": "Asset",                   "description": "ROU asset — finance lease",                 "module": "lease" },
+    { "id": "m014", "usAccount": "215000", "frAccount": "421",  "type": "Payable",                 "description": "Salaries & wages payable",                  "module": "pma" }
+  ]
+}

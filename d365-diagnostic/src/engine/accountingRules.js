@@ -260,6 +260,31 @@ const ROOT_CAUSES = {
     ],
     fix: 'Ensure reversal entries exactly mirror the forward accrual in amount and account. Void and repost if necessary.',
   },
+  GAAP_MAPPING_MISMATCH: {
+    code: 'RC-011',
+    title: 'GAAP Account Mapping Mismatch',
+    description: 'Account used is on the wrong side of a defined US↔FR GAAP mapping for the current GAAP context.',
+    severity: 'medium',
+    possibleCauses: [
+      'US GAAP account used in a French GAAP entity posting profile',
+      'French PCG account used in a US GAAP entity posting profile',
+      'Dual-entity implementation where posting profiles are shared across GAAP entities without adaptation',
+      'Migration error: accounts copied from one GAAP chart to the other without remapping',
+    ],
+    fix: 'Review the posting profile for this module and correct the account to the appropriate GAAP equivalent. Navigate to Configuration → GAAP Mapping to view and manage mappings.',
+  },
+  GAAP_MAPPING_MISSING: {
+    code: 'RC-012',
+    title: 'Missing GAAP Account Mapping',
+    description: 'No US↔FR GAAP mapping is defined for this account. Cross-GAAP traceability is unavailable for this entry.',
+    severity: 'low',
+    possibleCauses: [
+      'Account was added to the chart of accounts after the GAAP mapping table was last maintained',
+      'Custom chart of accounts account with no standard GAAP equivalent',
+      'GAAP mapping configuration is incomplete — only a subset of accounts have been mapped',
+    ],
+    fix: 'Add a mapping entry in Configuration → GAAP Mapping for this account to enable cross-GAAP traceability.',
+  },
   DUPLICATE_ENTRY: {
     code: 'RC-005',
     title: 'Possible Duplicate Voucher',

@@ -7,6 +7,7 @@ import ExcelImport from './components/ExcelImport';
 import DiagnosticResults from './components/DiagnosticResults';
 import VoucherAnalysis from './components/VoucherAnalysis';
 import ExportPanel from './components/ExportPanel';
+import GaapMapping from './components/GaapMapping';
 
 const DEFAULT_CONTEXT = {
   module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false,
@@ -262,6 +263,7 @@ export default function App() {
       case 'context':   return <ContextSelector context={context} setContext={setContext} />;
       case 'scenarios': return <ScenarioBuilder scenarios={scenarios} setScenarios={setScenarios} context={context} />;
       case 'import':    return <ExcelImport importedData={importedData} setImportedData={setImportedData} />;
+      case 'gaap':      return <GaapMapping />;
       case 'results':   return <DiagnosticResults result={diagnosticResult} isRunning={isRunning} />;
       case 'vouchers':  return <VoucherAnalysis result={diagnosticResult} />;
       case 'export':    return <ExportPanel diagnosticResult={diagnosticResult} context={context} />;
