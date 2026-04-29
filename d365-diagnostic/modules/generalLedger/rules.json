@@ -1,0 +1,24 @@
+{
+  "_meta": { "module": "general_ledger", "label": "General Ledger" },
+
+  "Manual": {
+    "label": "Manual Journal Entry",
+    "debit":  ["MainAccount", "LedgerMapping"],
+    "credit": ["MainAccount", "LedgerMapping"]
+  },
+  "Allocation": {
+    "label": "Ledger Allocation",
+    "debit":  ["AllocationRules", "LedgerMapping"],
+    "credit": ["AllocationRules", "LedgerMapping"]
+  },
+  "Periodic": {
+    "label": "Periodic Journal (Accrual / Deferral)",
+    "debit":  ["MainAccount", "LedgerMapping"],
+    "credit": ["MainAccount", "LedgerMapping"]
+  },
+  "Intercompany": {
+    "label": "Intercompany Transaction",
+    "debit":  ["IntercompanySetup", "LedgerMapping"],
+    "credit": ["IntercompanySetup", "LedgerMapping"]
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "MainAccount": {
+    "applicableModules": ["general_ledger"],
+    "description": "Chart of accounts main account definition. For General Ledger manual journals and periodic journals, the account is selected directly from the chart of accounts. This is the primary (and often only) source for GL entries.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Main Account": {
+        "description": "Any GL account selected directly in a manual journal or periodic journal",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  },
+
+  "AllocationRules": {
+    "applicableModules": ["general_ledger"],
+    "description": "Ledger allocation rules define how source amounts are allocated across destination financial dimensions or accounts. Used for cost allocation, shared services recharges, and overhead distribution. Investigate this source when allocation entries post to unexpected accounts.",
+    "d365Path": "General Ledger > Journals > Allocation > Ledger Allocation Rules",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Source Account": {
+        "description": "Account or account range from which allocation amounts are drawn",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      },
+      "Destination Account": {
+        "description": "Account to which allocated amounts are posted",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  },
+
+  "IntercompanySetup": {
+    "applicableModules": ["general_ledger"],
+    "description": "Intercompany accounting setup defines the due-to / due-from accounts used when intercompany transactions are posted. If intercompany entries appear in unexpected accounts, check the intercompany account configuration.",
+    "d365Path": "General Ledger > Setup > Intercompany Accounting",
+    "priority": 2,
+    "confidence": "High",
+    "fields": {
+      "Due From Account (Intercompany Receivable)": {
+        "description": "Account debited in the lending / selling entity for an intercompany transaction",
+        "accountPrefixes": { "FR": ["18","181","182"], "US": ["180"] },
+        "canonicalPrefixes": { "FR": ["181","182"], "US": ["180000"] }
+      },
+      "Due To Account (Intercompany Payable)": {
+        "description": "Account credited in the borrowing / buying entity for an intercompany transaction",
+        "accountPrefixes": { "FR": ["18","185","186"], "US": ["185"] },
+        "canonicalPrefixes": { "FR": ["185","186"], "US": ["185000"] }
+      }
+    }
+  },
+
+  "LedgerMapping": {
+    "applicableModules": ["general_ledger"],
+    "description": "Fallback for General Ledger — in this module, LedgerMapping and MainAccount are essentially equivalent since GL entries are by definition direct chart-of-accounts postings.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 99,
+    "confidence": "Low",
+    "fields": {
+      "Main Account (Direct GL)": {
+        "description": "Direct chart of accounts reference",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  }
+}

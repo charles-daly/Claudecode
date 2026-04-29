@@ -3,201 +3,153 @@
 // ─── French PCG Chart of Accounts (Plan Comptable Général) ────────────────────
 const PCG_ACCOUNTS = {
   // Class 1 – Capital & long-term liabilities
-  '1681':  'Lease Liability – IFRS 16',
-  '1682':  'Finance Lease Liability',
-  '16881': 'Current Portion – Lease Liability',
-  '1688':  'Interest Payable on Leases',
+  '101':   'Capital Social',
+  '106':   'Réserves',
+  '1062':  'Réserve de réévaluation',
+  '107':   'Écarts de réévaluation',
+  '1681':  'Dettes de location – IFRS 16',
+  '1682':  'Dettes de location-financement',
+  '16881': 'Part courante – Dette de location',
+  '1688':  'Intérêts courus sur location',
   '15':    'Provisions',
-  '1510':  'PMA Reserve (Provision PMA)',
+  '1510':  'Réserve PMA (Provision PMA)',
+  '181':   'Créance interentreprises (Due From)',
+  '182':   'Avances interentreprises',
+  '185':   'Dette interentreprises (Due To)',
+  '186':   'Comptes courants interentreprises',
 
   // Class 2 – Fixed assets & accumulated depreciation
-  '2051':  'Concessions, Patents, Licences',
-  '2152':  'Land',
-  '2154':  'Equipment & Tooling',
-  '2157':  'Vehicles',
-  '2182':  'Machinery',
-  '2315':  'Installations (generic)',
-  '2318':  'ROU Asset – Land (IFRS 16)',
-  '2319':  'ROU Asset – Buildings (IFRS 16)',
-  '2321':  'ROU Asset – Other (IFRS 16)',
-  '2328':  'ROU Asset – Generic (IFRS 16)',
-  '28154': 'Accumulated Depreciation – Equipment',
-  '28182': 'Accumulated Depreciation – Machinery',
-  '2818':  'Accumulated Depreciation – ROU Asset',
-  '2851':  'Accumulated Amortisation – Software',
+  '2051':  'Concessions, brevets, licences',
+  '2152':  'Terrain (exploitation)',
+  '2154':  'Matériel et outillage',
+  '2157':  'Véhicules',
+  '2182':  'Matériel industriel',
+  '2315':  'Installations (générique)',
+  '2318':  'Droit d\'usage – Terrain (IFRS 16)',
+  '2319':  'Droit d\'usage – Bâtiment (IFRS 16)',
+  '2321':  'Droit d\'usage – Autre (IFRS 16)',
+  '2328':  'Droit d\'usage – Générique (IFRS 16)',
+  '28154': 'Amort. cumulé – Matériel et outillage',
+  '28182': 'Amort. cumulé – Matériel industriel',
+  '2818':  'Amort. cumulé – Droit d\'usage',
+  '2851':  'Amort. cumulé – Logiciels',
+
+  // Class 3 – Stocks & WIP
+  '311':   'Matières premières (stocks)',
+  '315':   'Fournitures consommables',
+  '321':   'Autres approvisionnements',
+  '325':   'Emballages',
+  '341':   'Produits en cours – marchandises',
+  '345':   'Travaux en cours – services',
+  '351':   'Produits intermédiaires (semi-finis)',
+  '355':   'Produits finis',
+  '371':   'Marchandises',
+  '375':   'Produits résiduels / récupérés',
+  '381':   'Marchandises en cours de route',
+  '3411':  'Encours de production – biens',
+  '3511':  'Produits semi-finis en cours',
 
   // Class 4 – Third parties
-  '401':   'Trade Payables (General Suppliers)',
-  '404':   'Suppliers of Fixed Assets',
-  '411':   'Trade Receivables',
-  '512':   'Bank – Current Account',
+  '401':   'Fournisseurs (comptes généraux)',
+  '404':   'Fournisseurs d\'immobilisations',
+  '408':   'Fournisseurs – factures non parvenues (accrual)',
+  '409':   'Fournisseurs – avances versées (acomptes)',
+  '411':   'Clients',
+  '4111':  'Clients – comptes généraux',
+  '418':   'Clients – produits non encore facturés',
+  '419':   'Clients – avances reçues',
+  '421':   'Personnel – rémunérations dues',
+  '422':   'Organismes sociaux',
+  '4451':  'TVA déductible',
+  '4457':  'TVA collectée',
+  '486':   'Charges constatées d\'avance',
+  '487':   'Produits constatés d\'avance',
+  '512':   'Banques – comptes courants',
 
   // Class 6 – Charges (expenses)
-  '6154':  'Equipment Rental Expense',
-  '6156':  'Building Maintenance',
-  '6181':  'Operating Lease Expense (short-term / low-value)',
-  '661':   'Interest Expense (general)',
-  '6615':  'Interest on Current Accounts',
-  '6618':  'Interest on Lease Liabilities (IFRS 16)',
-  '675':   'Disposal Loss',
-  '6811':  'Depreciation – Tangible Assets',
-  '6812':  'Depreciation – Intangible Assets',
-  '68725': 'PMA Provision Charge',
-  '6872':  'Provision Charges – Fixed Assets',
+  '601':   'Achats de matières premières',
+  '602':   'Achats d\'autres approvisionnements',
+  '604':   'Achats d\'études et de prestations',
+  '605':   'Achats de matériel et travaux',
+  '607':   'Achats de marchandises',
+  '6037':  'Variation des stocks de marchandises (COGS)',
+  '603':   'Variation des stocks – approvisionnements',
+  '6061':  'Fournitures non stockables – consommables',
+  '6091':  'Rabais et remises obtenus sur achats',
+  '615':   'Entretien et réparations',
+  '6154':  'Loyers de matériel (crédit-bail)',
+  '6156':  'Entretien bâtiment',
+  '6181':  'Loyers de crédit-bail (court terme / faible valeur)',
+  '621':   'Personnel extérieur à l\'entreprise',
+  '622':   'Rémunérations d\'intermédiaires',
+  '625':   'Déplacements, missions, réceptions',
+  '641':   'Salaires et appointements',
+  '645':   'Charges de sécurité sociale',
+  '646':   'Cotisations sociales patronales',
+  '661':   'Charges d\'intérêts (générique)',
+  '6615':  'Intérêts sur comptes courants',
+  '6618':  'Intérêts sur dettes de location (IFRS 16)',
+  '675':   'Valeur comptable des éléments cédés (perte)',
+  '6811':  'Dotation amortissement – immob. corporelles',
+  '6812':  'Dotation amortissement – immob. incorporelles',
+  '68725': 'Dotation provisions PMA',
+  '6872':  'Dotation provisions – immobilisations',
+  '697':   'Pertes de valeur sur actifs circulants',
 
   // Class 7 – Products (revenue & gains)
-  '775':   'Asset Disposal Gain',
-  '78725': 'PMA Provision Write-back',
+  '701':   'Ventes de produits finis',
+  '706':   'Prestations de services',
+  '707':   'Ventes de marchandises',
+  '708':   'Produits des activités annexes',
+  '71':    'Production stockée (variation stocks produits)',
+  '712':   'Variation des en-cours de production',
+  '775':   'Produits de cession d\'immobilisations (gain)',
+  '78725': 'Reprises provisions PMA',
 };
 
 // ─── US GAAP D365 Chart of Accounts (simplified) ─────────────────────────────
 const US_ACCOUNTS = {
   '100000': 'Cash & Cash Equivalents',
-  '110000': 'Accounts Receivable',
-  '150100': 'Machinery & Equipment – Cost',
-  '150200': 'Vehicles – Cost',
-  '152000': 'ROU Asset – Finance Lease',
-  '152100': 'ROU Asset – Operating Lease',
-  '159000': 'Accumulated Depreciation – Fixed Assets',
-  '159100': 'Accumulated Amortisation – Operating Lease ROU',
-  '159200': 'Accumulated Depreciation – Finance Lease ROU',
-  '200100': 'Accounts Payable – Fixed Assets',
-  '210000': 'Finance Lease Liability – LT',
-  '210100': 'Finance Lease Liability – Current',
-  '211000': 'Operating Lease Liability – LT',
-  '211100': 'Operating Lease Liability – Current',
+  '110000': 'Accounts Receivable (Trade)',
+  '120000': 'Accrued Revenue / Unbilled Receivables',
+  '125000': 'Deferred Revenue — Current',
+  '130100': 'WIP Inventory',
+  '140000': 'Finished Goods Inventory',
+  '141000': 'Raw Materials Inventory',
+  '150100': 'Machinery & Equipment — Cost',
+  '150200': 'Vehicles — Cost',
+  '152000': 'ROU Asset — Finance Lease',
+  '152100': 'ROU Asset — Operating Lease',
+  '159000': 'Accumulated Depreciation — Fixed Assets',
+  '159100': 'Accumulated Amortisation — Operating Lease ROU',
+  '159200': 'Accumulated Depreciation — Finance Lease ROU',
+  '180000': 'Intercompany Receivable (Due From)',
+  '185000': 'Intercompany Payable (Due To)',
+  '200000': 'Accounts Payable (Trade)',
+  '200100': 'Accounts Payable — Fixed Assets',
+  '205000': 'Accrued Liabilities / Uninvoiced Receipts',
+  '206000': 'Vendor Prepayments',
+  '210000': 'Finance Lease Liability — LT',
+  '210100': 'Finance Lease Liability — Current',
+  '211000': 'Operating Lease Liability — LT',
+  '211100': 'Operating Lease Liability — Current',
   '215000': 'Interest Payable',
+  '215100': 'Salaries & Wages Payable',
+  '230000': 'Deferred Revenue — Long Term',
+  '400100': 'Service Revenue',
+  '400200': 'Product Sales Revenue',
+  '400300': 'Other Revenue',
+  '500100': 'Cost of Goods Sold',
   '510000': 'Depreciation Expense',
-  '510100': 'Depreciation – Finance Lease ROU',
-  '510200': 'Amortisation – Operating Lease ROU',
+  '510100': 'Depreciation — Finance Lease ROU',
+  '510200': 'Amortisation — Operating Lease ROU',
+  '520000': 'Salaries & Wages Expense',
+  '530000': 'Employee Benefits Expense',
+  '540000': 'Travel & Entertainment Expense',
+  '550000': 'Professional Services Expense',
   '600100': 'Finance Lease Interest Expense',
   '601000': 'Operating Lease Expense (straight-line)',
   '700000': 'Gain / Loss on Asset Disposal',
-};
-
-// ─── Transaction rules: expected account patterns per context ──────────────────
-const TRANSACTION_RULES = {
-  lease: {
-    french_gaap: {
-      recognition: {
-        label: 'Lease Initial Recognition',
-        entries: [
-          { side: 'debit',  accounts: ['2318','2319','2321','2328','231'], label: 'ROU Asset' },
-          { side: 'credit', accounts: ['1681','1682'],                     label: 'Lease Liability' },
-        ],
-      },
-      depreciation: {
-        label: 'Monthly ROU Depreciation',
-        entries: [
-          { side: 'debit',  accounts: ['6811','6812'],                      label: 'Depreciation Charge' },
-          { side: 'credit', accounts: ['2818','28154','28182'],             label: 'Accumulated Depreciation' },
-        ],
-        pmaEntries: [
-          { side: 'debit',  accounts: ['68725','6872'],                     label: 'PMA Provision Charge' },
-          { side: 'credit', accounts: ['1510','15'],                        label: 'PMA Reserve' },
-        ],
-      },
-      interest_accrual: {
-        label: 'Lease Interest Accrual',
-        entries: [
-          { side: 'debit',  accounts: ['6618'],                            label: 'Lease Interest Expense' },
-          { side: 'credit', accounts: ['1688','16881'],                    label: 'Interest Payable' },
-        ],
-      },
-      payment: {
-        label: 'Lease Payment',
-        entries: [
-          { side: 'debit',  accounts: ['1681','1682','16881'],             label: 'Lease Liability Reduction' },
-          { side: 'credit', accounts: ['512'],                             label: 'Bank' },
-        ],
-      },
-    },
-    us_gaap: {
-      recognition_finance: {
-        label: 'Finance Lease Initial Recognition',
-        entries: [
-          { side: 'debit',  accounts: ['152000'],          label: 'ROU Asset – Finance Lease' },
-          { side: 'credit', accounts: ['210000','210100'], label: 'Finance Lease Liability' },
-        ],
-      },
-      recognition_operating: {
-        label: 'Operating Lease Initial Recognition',
-        entries: [
-          { side: 'debit',  accounts: ['152100'],          label: 'ROU Asset – Operating Lease' },
-          { side: 'credit', accounts: ['211000','211100'], label: 'Operating Lease Liability' },
-        ],
-      },
-      depreciation_finance: {
-        label: 'Finance Lease Depreciation',
-        entries: [
-          { side: 'debit',  accounts: ['510100'], label: 'Depreciation – Finance Lease' },
-          { side: 'credit', accounts: ['159200'], label: 'Accumulated Depreciation – Finance Lease ROU' },
-        ],
-      },
-      amortisation_operating: {
-        label: 'Operating Lease ROU Amortisation',
-        entries: [
-          { side: 'debit',  accounts: ['510200'], label: 'Amortisation – Operating Lease ROU' },
-          { side: 'credit', accounts: ['159100'], label: 'Accumulated Amortisation – Operating Lease ROU' },
-        ],
-      },
-      interest_finance: {
-        label: 'Finance Lease Interest',
-        entries: [
-          { side: 'debit',  accounts: ['600100'], label: 'Finance Lease Interest Expense' },
-          { side: 'credit', accounts: ['215000'], label: 'Interest Payable' },
-        ],
-      },
-      lease_expense_operating: {
-        label: 'Operating Lease Expense (straight-line)',
-        entries: [
-          { side: 'debit',  accounts: ['601000'],                         label: 'Operating Lease Expense' },
-          { side: 'credit', accounts: ['211000','211100','100000'],       label: 'Lease Liability or Cash' },
-        ],
-      },
-    },
-  },
-  fixed_assets: {
-    french_gaap: {
-      acquisition: {
-        label: 'Fixed Asset Acquisition',
-        entries: [
-          { side: 'debit',  accounts: ['2154','2157','2182','2051','2152','215','21'], label: 'Fixed Asset' },
-          { side: 'credit', accounts: ['404'],                                         label: 'Supplier of Fixed Assets' },
-        ],
-      },
-      depreciation: {
-        label: 'Asset Depreciation',
-        entries: [
-          { side: 'debit',  accounts: ['6811','6812'],            label: 'Depreciation Expense' },
-          { side: 'credit', accounts: ['28154','28182','2818','2851'], label: 'Accumulated Depreciation' },
-        ],
-      },
-      disposal: {
-        label: 'Asset Disposal',
-        entries: [
-          { side: 'debit',  accounts: ['28154','28182','2851','28'], label: 'Accumulated Depreciation (reversal)' },
-          { side: 'credit', accounts: ['2154','2157','2182','2051'], label: 'Fixed Asset Cost (removal)' },
-        ],
-      },
-    },
-    us_gaap: {
-      acquisition: {
-        label: 'Fixed Asset Acquisition',
-        entries: [
-          { side: 'debit',  accounts: ['150100','150200'],  label: 'Fixed Asset – Cost' },
-          { side: 'credit', accounts: ['200100'],            label: 'AP – Fixed Assets' },
-        ],
-      },
-      depreciation: {
-        label: 'Asset Depreciation',
-        entries: [
-          { side: 'debit',  accounts: ['510000'], label: 'Depreciation Expense' },
-          { side: 'credit', accounts: ['159000'], label: 'Accumulated Depreciation' },
-        ],
-      },
-    },
-  },
 };
 
 // ─── Root cause catalogue ──────────────────────────────────────────────────────
@@ -208,12 +160,12 @@ const ROOT_CAUSES = {
     description: 'An account code does not match the expected account for this transaction type.',
     severity: 'high',
     possibleCauses: [
-      'D365 Lease/Asset posting profile misconfigured',
+      'D365 posting profile misconfigured (Lease, FA, PMA, Procurement, or Sales)',
       'Account incorrectly mapped in module parameters',
       'Manual journal entry used a wrong account',
       'Chart of accounts migration error',
     ],
-    fix: 'Review D365 posting profiles: Lease ▸ Setup ▸ Lease Posting Profiles  OR  Fixed Assets ▸ Setup ▸ Fixed Asset Posting Profiles',
+    fix: 'Review D365 posting profiles for the relevant module. Use the Source Intelligence panel to navigate to the exact configuration element.',
   },
   UNBALANCED_VOUCHER: {
     code: 'RC-002',
@@ -234,8 +186,8 @@ const ROOT_CAUSES = {
     description: 'An expected accounting entry was not generated by the system.',
     severity: 'high',
     possibleCauses: [
-      'Batch job did not run (monthly depreciation / interest accrual)',
-      'Lease or Asset not configured correctly in the module',
+      'Batch job did not run (monthly depreciation / interest accrual / revenue recognition)',
+      'Module not configured correctly',
       'Feature not enabled in module parameters',
       'PMA posting profile not configured',
     ],
@@ -276,37 +228,57 @@ const ROOT_CAUSES = {
       'Exchange rate applied incorrectly (multi-currency scenario)',
       'Manual override of system-calculated amount',
     ],
-    fix: 'Recalculate expected amount manually. Review lease/asset setup parameters and exchange rate configuration.',
+    fix: 'Recalculate expected amount manually. Review module setup parameters and exchange rate configuration.',
   },
 };
 
 // ─── Known misconfiguration patterns (account → expected) ─────────────────────
+// These are cross-module common errors that the analyzer checks for.
 const COMMON_ACCOUNT_ERRORS = {
+  // Lease
   '661': {
     shouldBe: ['6618'],
-    context: 'lease_interest',
-    detail: 'Account 661 (general interest) used instead of 6618 (lease interest per IFRS 16). Update the Lease Posting Profile.',
+    context:  'lease_interest',
+    detail:   'Account 661 (general interest) used instead of 6618 (lease interest per IFRS 16). Update the Lease Posting Profile.',
   },
   '6615': {
     shouldBe: ['6618'],
-    context: 'lease_interest',
-    detail: 'Account 6615 (current account interest) used instead of 6618 (lease interest). Likely a wrong posting profile selection.',
-  },
-  '401': {
-    shouldBe: ['404'],
-    context: 'asset_acquisition',
-    detail: 'General supplier account (401) used instead of fixed asset supplier account (404). Update Fixed Asset Posting Profile.',
+    context:  'lease_interest',
+    detail:   'Account 6615 (current account interest) used instead of 6618 (lease interest). Likely a wrong posting profile selection.',
   },
   '6181': {
     shouldBe: ['6618'],
-    context: 'finance_lease_interest',
-    detail: 'Operating lease expense account (6181) posted for a finance lease interest accrual. Check lease classification in D365.',
+    context:  'finance_lease_interest',
+    detail:   'Operating lease expense (6181) posted for a finance lease interest accrual. Check lease classification in D365.',
+  },
+  // Fixed Assets / Procurement
+  '401': {
+    shouldBe: ['404'],
+    context:  'asset_acquisition',
+    detail:   'General supplier account (401) used instead of fixed asset supplier account (404). Update Fixed Asset Posting Profile.',
+  },
+  // Sales / Procurement
+  '601': {
+    shouldBe: ['607'],
+    context:  'cogs',
+    detail:   'Raw material purchase account (601) used for COGS — should reflect stock movement (607/6037). Check Item Group Posting.',
+  },
+  // PMA
+  '419': {
+    shouldBe: ['411'],
+    context:  'customer_invoice',
+    detail:   'Customer advance account (419) used instead of trade receivables (411). Check customer posting profile.',
+  },
+  // Procurement accrual
+  '408_to_401': {
+    shouldBe: ['401'],
+    context:  'invoice_matched',
+    detail:   'Accrual account (408) still open after invoice match — the matching process should have reversed 408 and credited 401.',
   },
 };
 
 function getAccountName(code, country = 'FR') {
   const map = country === 'FR' ? PCG_ACCOUNTS : US_ACCOUNTS;
-  // Try exact, then prefix match
   if (map[code]) return map[code];
   for (const [key, val] of Object.entries(map)) {
     if (code.startsWith(key)) return val;
@@ -317,7 +289,6 @@ function getAccountName(code, country = 'FR') {
 module.exports = {
   PCG_ACCOUNTS,
   US_ACCOUNTS,
-  TRANSACTION_RULES,
   ROOT_CAUSES,
   COMMON_ACCOUNT_ERRORS,
   getAccountName,

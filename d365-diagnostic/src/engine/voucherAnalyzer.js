@@ -3,7 +3,6 @@
 const {
   ROOT_CAUSES,
   COMMON_ACCOUNT_ERRORS,
-  TRANSACTION_RULES,
   getAccountName,
 } = require('./accountingRules');
 
@@ -13,14 +12,16 @@ const {
   resolveVoucherSources,
 } = require('./accountSourceResolver');
 
+const { moduleLoader } = require('./moduleLoader');
+
 /**
  * Analyse a single grouped voucher object and return a full findings record.
- * Every issue is now enriched with account-source resolution data.
+ * All transaction rules are now loaded from the module plugin pack.
  */
 function analyseVoucher(voucher, context) {
   const issues = [];
   const { module, gaap, pma, country } = context;
-  const gaapKey     = gaap === 'dual_gaap' ? 'french_gaap' : gaap;
+  const gaapKey     = gaap === 'dual_gaap' ? 'french_gaap' : (gaap || 'french_gaap');
   const countryCode = country === 'FR' ? 'FR' : 'US';
 
   // 1 ── Balance check ────────────────────────────────────────────────────────
@@ -32,39 +33,45 @@ function analyseVoucher(voucher, context) {
       title:    ROOT_CAUSES.UNBALANCED_VOUCHER.title,
       detail:   `Imbalance of ${voucher.imbalance.toFixed(2)}. DR = ${voucher.totalDebit.toFixed(2)},  CR = ${voucher.totalCredit.toFixed(2)}`,
       fix:      ROOT_CAUSES.UNBALANCED_VOUCHER.fix,
-      actualSource:   null,
-      expectedSource: null,
+      actualSource:     null,
+      expectedSource:   null,
       sourceComparison: null,
+      universalModel:   { module, postingType: null, accountSource: null, configElement: null },
     });
   }
 
-  // 2 ── Detect transaction type ──────────────────────────────────────────────
+  // 2 ── Detect transaction type from module transactions ─────────────────────
   const detectedType = detectTransactionType(voucher, module);
 
-  // 3 ── Resolve sources for every line (full source map for the voucher) ─────
+  // 3 ── Resolve sources for every line ──────────────────────────────────────
   const sourceMap = resolveVoucherSources(voucher, detectedType, context);
 
-  // 4 ── Validate accounts against transaction rules ─────────────────────────
-  if (detectedType !== 'unknown') {
-    const ruleSet = TRANSACTION_RULES[module]?.[gaapKey]?.[detectedType];
-    if (ruleSet) {
+  // 4 ── Validate accounts against module transaction rules ───────────────────
+  if (detectedType && detectedType !== 'unknown') {
+    const mod   = moduleLoader.loadModule(module);
+    const txDef = mod.transactions[detectedType];
+
+    if (txDef) {
+      const applicableEntries = (txDef.entries || []).filter(
+        e => !e.gaap || e.gaap === 'all' || e.gaap === gaapKey
+      );
+
       const accountIssues = validateAccountsAgainstRules(
-        voucher.entries, ruleSet.entries, countryCode, detectedType, context
+        voucher.entries, applicableEntries, countryCode, detectedType, context
       );
       issues.push(...accountIssues);
 
       // 5 ── PMA check ───────────────────────────────────────────────────────
-      if (pma && detectedType === 'depreciation' && ruleSet.pmaEntries) {
+      if (pma && detectedType === 'Depreciation' && txDef.pmaEntries) {
+        const pmaEntries = txDef.pmaEntries.filter(
+          e => !e.gaap || e.gaap === 'all' || e.gaap === gaapKey
+        );
         const hasPMA = voucher.entries.some(e =>
-          ruleSet.pmaEntries.some(pe =>
-            pe.accounts.some(a => e.account.startsWith(a))
-          )
+          pmaEntries.some(pe => pe.accounts.some(a => e.account.startsWith(a)))
         );
         if (!hasPMA) {
-          // Resolve what the expected PMA account source would be
           const expectedPMASrc = resolveAccountSource({
-            module, transactionType: 'depreciation', side: 'debit',
-            account: '68725', context,
+            module, transactionType: detectedType, side: 'debit', account: '68725', context,
           });
           issues.push({
             type:     'PMA_NOT_POSTED',
@@ -78,8 +85,16 @@ function analyseVoucher(voucher, context) {
             sourceComparison: {
               sameSource:     false,
               severity:       'missing',
-              explanation:    `PMA entry is absent. Expected: ${expectedPMASrc.source} → "${expectedPMASrc.field}".`,
+              explanation:    `PMA entry absent. Expected: ${expectedPMASrc.source} → "${expectedPMASrc.field}".`,
               actionRequired: `Configure PMA accounts in: ${expectedPMASrc.d365Path}`,
+            },
+            universalModel: {
+              module,
+              transactionType: detectedType,
+              postingType:     'debit',
+              accountSource:   expectedPMASrc.source,
+              configElement:   expectedPMASrc.field,
+              mainAccount:     '68725',
             },
           });
         }
@@ -87,10 +102,15 @@ function analyseVoucher(voucher, context) {
     }
   }
 
-  // 6 ── Known misconfiguration patterns ─────────────────────────────────────
+  // 6 ── Module-specific and global known error patterns ─────────────────────
+  const mod       = moduleLoader.loadModule(module);
+  const txDef     = detectedType && detectedType !== 'unknown' ? mod.transactions[detectedType] : null;
+  const modErrors = txDef?.knownErrors || {};
+
   voucher.entries.forEach(entry => {
-    const pattern = COMMON_ACCOUNT_ERRORS[entry.account];
+    const pattern = modErrors[entry.account] || COMMON_ACCOUNT_ERRORS[entry.account];
     if (!pattern) return;
+
     const alreadyFlagged = issues.some(i =>
       i.type === 'WRONG_ACCOUNT' && i._entry?.account === entry.account
     );
@@ -98,12 +118,8 @@ function analyseVoucher(voucher, context) {
 
     const side = entry.debit > 0 ? 'debit' : 'credit';
     const pair = resolveAccountPair({
-      module,
-      transactionType: detectedType,
-      side,
-      actualAccount:   entry.account,
-      expectedAccount: pattern.shouldBe[0],
-      context,
+      module, transactionType: detectedType || 'unknown',
+      side, actualAccount: entry.account, expectedAccount: pattern.shouldBe[0], context,
     });
 
     issues.push({
@@ -118,6 +134,14 @@ function analyseVoucher(voucher, context) {
       actualSource:     pair.actual,
       expectedSource:   pair.expected,
       sourceComparison: pair.comparison,
+      universalModel: {
+        module,
+        transactionType: detectedType,
+        postingType:     side,
+        accountSource:   pair.actual?.source,
+        configElement:   pair.actual?.field,
+        mainAccount:     entry.account,
+      },
     });
   });
 
@@ -134,7 +158,8 @@ function analyseVoucher(voucher, context) {
     totalCredit:  voucher.totalCredit,
     isBalanced:   voucher.isBalanced,
     detectedType,
-    sourceMap,           // ← full source resolution per line
+    module,
+    sourceMap,
     issues,
     suggestions:  buildSuggestions(issues, context, detectedType),
     severity,
@@ -142,34 +167,29 @@ function analyseVoucher(voucher, context) {
   };
 }
 
-// ─── Account validation against rules ────────────────────────────────────────
+// ─── Account validation against module transaction rules ──────────────────────
 function validateAccountsAgainstRules(entries, ruleEntries, countryCode, transactionType, context) {
   const issues = [];
 
   entries.forEach(entry => {
-    const side       = entry.debit > 0 ? 'debit' : 'credit';
-    const sideRules  = ruleEntries.filter(r => r.side === side);
+    const side      = entry.debit > 0 ? 'debit' : 'credit';
+    const sideRules = ruleEntries.filter(r => r.side === side);
     if (sideRules.length === 0) return;
 
-    const validPrefixes = sideRules.flatMap(r => r.accounts);
-    const isValid       = validPrefixes.some(p => entry.account.startsWith(p));
+    const validPrefixes = sideRules.flatMap(r => r.accounts).filter(a => a !== '');
+    if (validPrefixes.length === 0) return; // wildcard GL manual — always valid
+
+    const isValid = validPrefixes.some(p => entry.account.startsWith(p));
     if (isValid) return;
 
-    // Account is invalid — resolve both actual and expected sources
     const expectedRepresentative = validPrefixes[0] || '';
     const pair = resolveAccountPair({
-      module:          context.module,
-      transactionType,
-      side,
-      actualAccount:   entry.account,
-      expectedAccount: expectedRepresentative,
-      context,
+      module: context.module, transactionType, side,
+      actualAccount: entry.account, expectedAccount: expectedRepresentative, context,
     });
 
     const actualName   = getAccountName(entry.account, countryCode);
-    const expectedDesc = sideRules
-      .map(r => `${r.accounts.join(' / ')} (${r.label})`)
-      .join('  OR  ');
+    const expectedDesc = sideRules.map(r => `${r.accounts.join(' / ')} (${r.label})`).join('  OR  ');
 
     issues.push({
       type:     'WRONG_ACCOUNT',
@@ -179,72 +199,74 @@ function validateAccountsAgainstRules(entries, ruleEntries, countryCode, transac
       detail:   `${side.toUpperCase()} ${entry.account} "${actualName}" — Expected: ${expectedDesc}`,
       fix:      pair.comparison?.actionRequired || ROOT_CAUSES.WRONG_ACCOUNT.fix,
       _entry:   entry,
-      expectedPrefixes:  validPrefixes,
-      actualSource:      pair.actual,
-      expectedSource:    pair.expected,
-      sourceComparison:  pair.comparison,
+      expectedPrefixes: validPrefixes,
+      actualSource:     pair.actual,
+      expectedSource:   pair.expected,
+      sourceComparison: pair.comparison,
+      universalModel: {
+        module:          context.module,
+        transactionType,
+        postingType:     side,
+        accountSource:   pair.actual?.source,
+        configElement:   pair.actual?.field,
+        mainAccount:     entry.account,
+      },
     });
   });
 
   return issues;
 }
 
-// ─── Transaction type detection ───────────────────────────────────────────────
+// ─── Transaction type detection (module-driven) ───────────────────────────────
 function detectTransactionType(voucher, module) {
-  const dr = voucher.debitAccounts  || [];
-  const cr = voucher.creditAccounts || [];
+  const dr  = voucher.debitAccounts  || [];
+  const cr  = voucher.creditAccounts || [];
+  const any = (list, prefixes) => {
+    const nonEmpty = prefixes.filter(p => p);
+    if (nonEmpty.length === 0) return true;
+    return list.some(a => nonEmpty.some(p => a.startsWith(p)));
+  };
 
-  const any = (list, prefixes) => list.some(a => prefixes.some(p => a.startsWith(p)));
-
-  if (module === 'lease') {
-    if (any(dr, ['231','232','2318','2319','2321','2328']) && any(cr, ['168','1681','1682']))
-      return 'recognition';
-    if (any(dr, ['6811','6812']) && any(cr, ['281','2818','28154']))
-      return 'depreciation';
-    if (any(dr, ['661','6618','6615']) && any(cr, ['168','1688']))
-      return 'interest_accrual';
-    if (any(dr, ['168','1681','16881']) && any(cr, ['512']))
-      return 'payment';
-  }
-
-  if (module === 'fixed_assets') {
-    if (any(dr, ['21','2154','2157','2182','2051']) && any(cr, ['40','401','404']))
-      return 'acquisition';
-    if (any(dr, ['6811','6812']) && any(cr, ['28','281']))
-      return 'depreciation';
-    if (any(dr, ['28','281']) && any(cr, ['21','2154','2157']))
-      return 'disposal';
-  }
+  try {
+    const mod = moduleLoader.loadModule(module);
+    for (const [txKey, txDef] of Object.entries(mod.transactions)) {
+      const det = txDef.detection;
+      if (!det) continue;
+      if (any(dr, det.debitPrefixes || []) && any(cr, det.creditPrefixes || [])) return txKey;
+    }
+  } catch (_) { /* fall through */ }
 
   return 'unknown';
 }
 
 // ─── Fix suggestions ──────────────────────────────────────────────────────────
 function buildSuggestions(issues, context, transactionType) {
-  const seen = new Set();
+  const seen        = new Set();
   const suggestions = [];
-
-  const add = (s) => {
-    if (!seen.has(s.action)) { seen.add(s.action); suggestions.push(s); }
-  };
+  const add = (s) => { if (!seen.has(s.action)) { seen.add(s.action); suggestions.push(s); } };
 
   issues.forEach(issue => {
-    // Use source-aware path if available
     if (issue.type === 'WRONG_ACCOUNT' && issue.actualSource) {
       const path = issue.expectedSource?.d365Path || issue.actualSource.d365Path;
-      add({ priority: 1, action: `Review account configuration in ${issue.actualSource.source}`, path, detail: issue.sourceComparison?.actionRequired || `Update account mapping for: ${transactionType}` });
+      add({ priority: 1,
+            action: `Review account configuration in ${issue.actualSource.source}`,
+            path, detail: issue.sourceComparison?.actionRequired || `Update mapping for: ${transactionType}` });
     } else if (issue.type === 'WRONG_ACCOUNT') {
-      const path = context.module === 'lease'
-        ? 'Lease ▸ Setup ▸ Lease Posting Profiles'
-        : 'Fixed Assets ▸ Setup ▸ Fixed Asset Posting Profiles';
-      add({ priority: 1, action: 'Review posting profile account mappings', path, detail: `Update account for: ${transactionType}` });
+      const meta = moduleLoader.loadModule(context.module)?.metadata;
+      add({ priority: 1,
+            action: 'Review posting profile account mappings',
+            path: meta ? `${meta.label} > Setup > Posting Profiles` : 'Module Setup > Posting Profiles',
+            detail: `Update account for: ${transactionType}` });
     }
     if (issue.type === 'UNBALANCED_VOUCHER') {
-      add({ priority: 0, action: 'Investigate voucher imbalance', path: 'General Ledger ▸ Inquiries ▸ Voucher transactions', detail: 'Search by voucher number; reverse and repost' });
+      add({ priority: 0, action: 'Investigate voucher imbalance',
+            path: 'General Ledger ▸ Inquiries ▸ Voucher transactions',
+            detail: 'Search by voucher number; reverse and repost' });
     }
     if (issue.type === 'PMA_NOT_POSTED') {
-      const path = issue.expectedSource?.d365Path || 'Fixed Assets ▸ Setup ▸ Fixed Asset Parameters';
-      add({ priority: 2, action: 'Configure PMA in French regulatory setup', path, detail: 'Enable PMA; map accounts 68725 DR / 1510 CR' });
+      add({ priority: 2, action: 'Configure PMA in French regulatory setup',
+            path: issue.expectedSource?.d365Path || 'Fixed Assets ▸ Setup ▸ Fixed Asset Parameters',
+            detail: 'Enable PMA; map accounts 68725 DR / 1510 CR' });
     }
   });
 

@@ -1,0 +1,186 @@
+{
+  "ProjectPostingProfile": {
+    "applicableModules": ["pma"],
+    "description": "Defines ledger accounts for all project transaction types (cost, revenue, WIP). This is the primary source for every PMA accounting entry and the first place to check when investigating account mapping errors.",
+    "d365Path": "Project Management and Accounting > Setup > Posting > Project Posting Profiles",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Cost Account": {
+        "description": "Expense account debited when project costs (labor, materials, expenses) are posted",
+        "accountPrefixes": { "FR": ["60","61","62","63","64","65"], "US": ["500","510","520","530","540","550"] },
+        "canonicalPrefixes": { "FR": ["601","602","604","621","622","625","641","645"], "US": ["500100","510100","520000","530000"] }
+      },
+      "Revenue Account": {
+        "description": "Revenue account credited on project revenue recognition or direct billing",
+        "accountPrefixes": { "FR": ["70","71"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["701","706","707","708"], "US": ["400100","400200"] }
+      },
+      "WIP — Cost Value Account": {
+        "description": "Balance sheet WIP asset account debited as costs accumulate on a project",
+        "accountPrefixes": { "FR": ["33","34","35"], "US": ["130"] },
+        "canonicalPrefixes": { "FR": ["3411","3511","341","351"], "US": ["130100"] }
+      },
+      "WIP — Sales Value Account": {
+        "description": "WIP account representing the sales value of in-progress project work",
+        "accountPrefixes": { "FR": ["48","418"], "US": ["120","125"] },
+        "canonicalPrefixes": { "FR": ["418","487"], "US": ["120000","125000"] }
+      }
+    }
+  },
+
+  "ProjectCategory": {
+    "applicableModules": ["pma"],
+    "description": "Project category configuration allows account overrides at the category level (e.g., separate accounts for IT projects vs. construction projects). Investigate this source when the posting profile is correct but a specific category posts to the wrong account.",
+    "d365Path": "Project Management and Accounting > Setup > Categories > Project Categories",
+    "priority": 2,
+    "confidence": "High",
+    "fields": {
+      "Category Cost Account Override": {
+        "description": "Category-level override for the cost account",
+        "accountPrefixes": { "FR": ["60","61","62","63","64","65"], "US": ["500","510","520","530","540","550"] },
+        "canonicalPrefixes": { "FR": ["601","621","641"], "US": ["500100","520000"] }
+      },
+      "Category Revenue Account Override": {
+        "description": "Category-level override for the revenue account",
+        "accountPrefixes": { "FR": ["70"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["701","706"], "US": ["400100"] }
+      }
+    }
+  },
+
+  "WIPPostingSetup": {
+    "applicableModules": ["pma"],
+    "description": "WIP posting setup defines the specific accounts used during WIP accumulation and revenue recognition for long-term / percentage-complete projects. Check this source when WIP entries are posted to the wrong balance sheet account.",
+    "d365Path": "Project Management and Accounting > Setup > Posting > WIP",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "WIP Cost Account": {
+        "description": "Asset account accumulating project costs before revenue is recognised",
+        "accountPrefixes": { "FR": ["33","34","35"], "US": ["130"] },
+        "canonicalPrefixes": { "FR": ["3411","3511"], "US": ["130100"] }
+      },
+      "WIP Sales Value Account": {
+        "description": "Account reflecting the sales value of work performed but not yet billed",
+        "accountPrefixes": { "FR": ["418","48"], "US": ["120"] },
+        "canonicalPrefixes": { "FR": ["418"], "US": ["120000"] }
+      },
+      "Realised Profit / Loss Account": {
+        "description": "P&L account credited when WIP is recognised as revenue",
+        "accountPrefixes": { "FR": ["70","71"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["706","708"], "US": ["400200"] }
+      }
+    }
+  },
+
+  "RevenueRecognition": {
+    "applicableModules": ["pma", "sales"],
+    "description": "Revenue Recognition schedule configuration controls how and when deferred revenue is released to the income statement. Relevant when milestone-based or percentage-complete revenue recognition is enabled in D365.",
+    "d365Path": "Revenue Recognition > Setup > Revenue Recognition Schedules",
+    "priority": 3,
+    "confidence": "Medium",
+    "fields": {
+      "Deferred Revenue Account": {
+        "description": "Balance sheet liability account holding revenue deferred until recognition criteria are met",
+        "accountPrefixes": { "FR": ["487","48"], "US": ["230","125"] },
+        "canonicalPrefixes": { "FR": ["487"], "US": ["230000","125000"] }
+      },
+      "Recognised Revenue Account": {
+        "description": "P&L account credited when deferred revenue is released",
+        "accountPrefixes": { "FR": ["70","71"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["701","706","707"], "US": ["400100","400200"] }
+      }
+    }
+  },
+
+  "CustomerPostingProfile": {
+    "applicableModules": ["pma", "sales"],
+    "description": "Accounts Receivable customer posting profile defines the AR summary account used when project invoices are raised. If AR is posting to the wrong account, the customer posting profile is the primary location to investigate.",
+    "d365Path": "Accounts Receivable > Setup > Customer Posting Profiles",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Summary Account (Trade Receivables)": {
+        "description": "General trade receivables account debited when a customer invoice is posted",
+        "accountPrefixes": { "FR": ["41"], "US": ["110"] },
+        "canonicalPrefixes": { "FR": ["411","4111"], "US": ["110000"] }
+      },
+      "Accrued Revenue Account": {
+        "description": "Account used for revenue earned but not yet invoiced (unbilled receivables)",
+        "accountPrefixes": { "FR": ["418"], "US": ["120"] },
+        "canonicalPrefixes": { "FR": ["418"], "US": ["120000"] }
+      }
+    }
+  },
+
+  "VendorPostingProfile": {
+    "applicableModules": ["pma", "procurement"],
+    "description": "Accounts Payable vendor posting profile. Used when project expenses are sourced via vendor invoices. The summary account (401) is the AP credit account in expense transactions.",
+    "d365Path": "Accounts Payable > Setup > Vendor Posting Profiles",
+    "priority": 4,
+    "confidence": "Medium",
+    "fields": {
+      "Trade Payables Summary Account": {
+        "description": "General supplier payable account",
+        "accountPrefixes": { "FR": ["401","403"], "US": ["200"] },
+        "canonicalPrefixes": { "FR": ["401"], "US": ["200000"] }
+      }
+    }
+  },
+
+  "PayrollPosting": {
+    "applicableModules": ["pma"],
+    "description": "Payroll posting profile determines how salaries and social charges are allocated to projects. When personnel costs post to the wrong account, check this source alongside the project posting profile.",
+    "d365Path": "Human Resources > Setup > Payroll > Payroll Posting Profiles",
+    "priority": 3,
+    "confidence": "Medium",
+    "fields": {
+      "Salary Expense Account": {
+        "description": "Gross salary expense account",
+        "accountPrefixes": { "FR": ["641"], "US": ["520"] },
+        "canonicalPrefixes": { "FR": ["641"], "US": ["520000"] }
+      },
+      "Social Charges Account": {
+        "description": "Employer social security / benefits contribution account",
+        "accountPrefixes": { "FR": ["645","646"], "US": ["530"] },
+        "canonicalPrefixes": { "FR": ["645"], "US": ["530000"] }
+      },
+      "Personnel Payable Account": {
+        "description": "Balance sheet liability for wages owed to employees",
+        "accountPrefixes": { "FR": ["421","422"], "US": ["215"] },
+        "canonicalPrefixes": { "FR": ["421"], "US": ["215000"] }
+      }
+    }
+  },
+
+  "BankAccountSetup": {
+    "applicableModules": ["pma"],
+    "description": "Bank account configuration linking the D365 bank account to a GL main account. Used when project expenses or receipts are settled directly via bank transfer.",
+    "d365Path": "Cash and Bank Management > Setup > Bank Accounts",
+    "priority": 5,
+    "confidence": "High",
+    "fields": {
+      "Bank Main Account": {
+        "description": "GL account mapped to the bank account for cash movements",
+        "accountPrefixes": { "FR": ["51","512"], "US": ["100"] },
+        "canonicalPrefixes": { "FR": ["512"], "US": ["100000"] }
+      }
+    }
+  },
+
+  "LedgerMapping": {
+    "applicableModules": ["pma"],
+    "description": "Chart of accounts main account — the fallback source. When no module-specific posting profile matches, the entry likely originated from a manual GL journal bypassing PMA module logic.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 99,
+    "confidence": "Low",
+    "fields": {
+      "Main Account (Direct GL)": {
+        "description": "Direct chart of accounts reference — no module posting profile source detected",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  }
+}

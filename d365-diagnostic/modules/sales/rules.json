@@ -1,0 +1,19 @@
+{
+  "_meta": { "module": "sales", "label": "Sales (Order-to-Cash)" },
+
+  "Invoice": {
+    "label": "Customer Invoice",
+    "debit":  ["CustomerPostingProfile", "LedgerMapping"],
+    "credit": ["ItemGroupPosting", "RevenueRecognition", "LedgerMapping"]
+  },
+  "Revenue": {
+    "label": "Revenue Recognition",
+    "debit":  ["RevenueRecognition", "LedgerMapping"],
+    "credit": ["RevenueRecognition", "ItemGroupPosting", "LedgerMapping"]
+  },
+  "COGS": {
+    "label": "Cost of Goods Sold",
+    "debit":  ["ItemGroupPosting", "LedgerMapping"],
+    "credit": ["ItemGroupPosting", "LedgerMapping"]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "Manual": {
+    "label": "Manual Journal Entry",
+    "description": "Free-form journal entry posted directly in the General Ledger. Any account may be used — no module-specific validation is applied.",
+    "detection": {
+      "debitPrefixes":  [],
+      "creditPrefixes": []
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": [""], "label": "Any Main Account" },
+      { "gaap": "all", "side": "credit", "accounts": [""], "label": "Any Main Account" }
+    ],
+    "knownErrors": {}
+  },
+
+  "Allocation": {
+    "label": "Ledger Allocation",
+    "description": "Cost or revenue allocation across financial dimensions or accounts using ledger allocation rules — overhead spreading, shared services recharge.",
+    "detection": {
+      "debitPrefixes":  ["60","61","62","63","64","65"],
+      "creditPrefixes": ["60","61","62","63","64","65","70","71"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": [""], "label": "Destination Cost Account (per Allocation Rule)" },
+      { "gaap": "all", "side": "credit", "accounts": [""], "label": "Source Cost Account (per Allocation Rule)" }
+    ],
+    "knownErrors": {}
+  },
+
+  "Periodic": {
+    "label": "Periodic Journal",
+    "description": "Recurring accruals and deferrals — prepayments, accrued expenses, accrued income. Typically reversed at period start.",
+    "detection": {
+      "debitPrefixes":  ["486","487","60","61","62","70"],
+      "creditPrefixes": ["486","487","60","61","62","70"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["486","487","60","61","70"], "label": "Prepayment / Accrued Expense / Deferred Revenue" },
+      { "gaap": "all", "side": "credit", "accounts": ["486","487","60","61","70"], "label": "Accrued Income / Expense Reversal / Deferred" }
+    ],
+    "knownErrors": {}
+  },
+
+  "Intercompany": {
+    "label": "Intercompany Transaction",
+    "description": "Cross-entity posting — intercompany receivable (due from) debited in one entity, intercompany payable (due to) credited in the counterpart entity.",
+    "detection": {
+      "debitPrefixes":  ["181","182","18"],
+      "creditPrefixes": ["185","186","18"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["181","182"], "label": "Intercompany Receivable (Due From)" },
+      { "gaap": "all", "side": "credit", "accounts": ["185","186"], "label": "Intercompany Payable (Due To)" }
+    ],
+    "knownErrors": {}
+  }
+}

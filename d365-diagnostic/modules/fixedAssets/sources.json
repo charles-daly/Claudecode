@@ -1,0 +1,132 @@
+{
+  "FixedAssetPostingProfile": {
+    "applicableModules": ["fixed_assets"],
+    "description": "Defines ledger accounts for all fixed asset transaction types: acquisition, depreciation, disposal, revaluation, and write-downs. This is the primary source for FA account errors and should be the first location checked when investigating fixed asset accounting issues.",
+    "d365Path": "Fixed Assets > Setup > Fixed Asset Posting Profiles",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Acquisition Account": {
+        "description": "Asset cost account debited when a fixed asset is acquired",
+        "accountPrefixes": { "FR": ["21"], "US": ["150"] },
+        "canonicalPrefixes": { "FR": ["2154","2157","2182","2051","2152"], "US": ["150100","150200"] }
+      },
+      "Acquisition Offset Account": {
+        "description": "FA-specific payable account credited at acquisition — distinct from general trade payables (401)",
+        "accountPrefixes": { "FR": ["404"], "US": ["200100"] },
+        "canonicalPrefixes": { "FR": ["404"], "US": ["200100"] }
+      },
+      "Depreciation Expense Account": {
+        "description": "Depreciation expense charged each period to P&L",
+        "accountPrefixes": { "FR": ["68"], "US": ["510"] },
+        "canonicalPrefixes": { "FR": ["6811","6812"], "US": ["510000"] }
+      },
+      "Accumulated Depreciation Account": {
+        "description": "Contra-asset account accumulating total depreciation on the fixed asset",
+        "accountPrefixes": { "FR": ["28"], "US": ["159"] },
+        "canonicalPrefixes": { "FR": ["28154","28182","2851"], "US": ["159000"] }
+      },
+      "Disposal Loss Account": {
+        "description": "P&L account for loss when net book value exceeds disposal proceeds",
+        "accountPrefixes": { "FR": ["67"], "US": ["700"] },
+        "canonicalPrefixes": { "FR": ["675"], "US": ["700000"] }
+      },
+      "Disposal Gain Account": {
+        "description": "P&L account for gain when disposal proceeds exceed net book value",
+        "accountPrefixes": { "FR": ["77"], "US": ["700"] },
+        "canonicalPrefixes": { "FR": ["775"], "US": ["700000"] }
+      },
+      "Revaluation Account": {
+        "description": "Account used when an asset is revalued upwards (asset cost adjustment)",
+        "accountPrefixes": { "FR": ["21"], "US": ["150"] },
+        "canonicalPrefixes": { "FR": ["2154","2157"], "US": ["150100"] }
+      }
+    }
+  },
+
+  "DepreciationProfile": {
+    "applicableModules": ["fixed_assets"],
+    "description": "Configures the depreciation calculation method (straight-line, reducing balance, ACRS, sum-of-digits) and rate. Some organisations configure method-specific account overrides here. Investigate when depreciation amounts are correct but the account used differs from the standard posting profile.",
+    "d365Path": "Fixed Assets > Setup > Depreciation Profiles",
+    "priority": 2,
+    "confidence": "Medium",
+    "fields": {
+      "Method-specific Depreciation Account Override": {
+        "description": "Optional account override at depreciation profile level",
+        "accountPrefixes": { "FR": ["68"], "US": ["510"] },
+        "canonicalPrefixes": { "FR": ["6811","6812"], "US": ["510000"] }
+      }
+    }
+  },
+
+  "AssetGroup": {
+    "applicableModules": ["fixed_assets", "lease"],
+    "description": "Fixed asset group configuration. Groups can specify default accounts that override the posting profile for all assets in the group. Check this source when the correct posting profile is set but individual assets in a specific group post to unexpected accounts.",
+    "d365Path": "Fixed Assets > Setup > Fixed Asset Groups",
+    "priority": 3,
+    "confidence": "Medium",
+    "fields": {
+      "Asset Group — Asset Account": {
+        "description": "Group-level default asset account",
+        "accountPrefixes": { "FR": ["21","23"], "US": ["150","152"] },
+        "canonicalPrefixes": { "FR": ["2154","2318","2319","2321"], "US": ["150100","152000","152100"] }
+      },
+      "Asset Group — Accumulated Depreciation": {
+        "description": "Group-level accumulated depreciation account override",
+        "accountPrefixes": { "FR": ["28"], "US": ["159"] },
+        "canonicalPrefixes": { "FR": ["2818","28154","28182"], "US": ["159000","159200"] }
+      }
+    }
+  },
+
+  "FrenchRegulatoryParameters": {
+    "applicableModules": ["fixed_assets", "lease"],
+    "conditionalOn": { "country": "FR", "gaap": "french_gaap" },
+    "description": "French regulatory feature parameters controlling PMA (Provision pour Mise en Amortissement). This source defines the charge account (68725) and reserve account (1510) posted alongside standard depreciation under French GAAP. Only active when French GAAP is selected and PMA is enabled.",
+    "d365Path": "Fixed Assets > Setup > Fixed Asset Parameters > French Regulatory Features (Tab)",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "PMA Provision Charge Account": {
+        "description": "Expense account for the periodic PMA provision charge (68725 in French PCG)",
+        "accountPrefixes": { "FR": ["687","68"] },
+        "canonicalPrefixes": { "FR": ["68725","6872"] }
+      },
+      "PMA Reserve Account": {
+        "description": "Balance sheet provision / reserve account for PMA (1510 in French PCG)",
+        "accountPrefixes": { "FR": ["151","15"] },
+        "canonicalPrefixes": { "FR": ["1510"] }
+      }
+    }
+  },
+
+  "VendorPostingProfile": {
+    "applicableModules": ["fixed_assets"],
+    "description": "Accounts Payable vendor posting profile. If a general trade-payable account (401) is used where an FA-specific account (404) is expected at acquisition, this indicates the transaction was routed through the AP module rather than the Fixed Asset acquisition workflow — a common D365 misconfiguration.",
+    "d365Path": "Accounts Payable > Setup > Vendor Posting Profiles",
+    "priority": 4,
+    "confidence": "Medium",
+    "fields": {
+      "Trade Payables Summary Account": {
+        "description": "General supplier payable account — NOT specific to fixed asset acquisitions",
+        "accountPrefixes": { "FR": ["401","403"], "US": ["200000"] },
+        "canonicalPrefixes": { "FR": ["401"], "US": ["200000"] }
+      }
+    }
+  },
+
+  "LedgerMapping": {
+    "applicableModules": ["fixed_assets"],
+    "description": "Chart of accounts main account — the fallback source. When no posting profile source matches, the account was likely entered via a manual general journal bypassing D365 Fixed Asset module logic.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 99,
+    "confidence": "Low",
+    "fields": {
+      "Main Account (Direct GL)": {
+        "description": "Direct chart of accounts reference — no module posting profile source detected",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  }
+}

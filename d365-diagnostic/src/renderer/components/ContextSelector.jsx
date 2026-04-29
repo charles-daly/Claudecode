@@ -1,45 +1,63 @@
 import React from 'react';
 
+const MODULES = [
+  { value: 'pma',            label: 'Project Management & Accounting', sub: 'Project cost, revenue and WIP', color: '#8b5cf6' },
+  { value: 'procurement',    label: 'Procurement (P2P)',               sub: 'Procure-to-Pay: invoices, receipts, accruals', color: '#f59e0b' },
+  { value: 'sales',          label: 'Sales (O2C)',                     sub: 'Order-to-Cash: invoices, revenue, COGS', color: '#22c55e' },
+  { value: 'fixed_assets',   label: 'Fixed Assets',                    sub: 'IAS 16 / ASC 360 — acquisition, depreciation, disposal', color: '#3b82f6' },
+  { value: 'inventory',      label: 'Inventory Management',            sub: 'Receipt, issue, transfer and adjustment', color: '#06b6d4' },
+  { value: 'lease',          label: 'Lease (IFRS 16 / ASC 842)',       sub: 'ROU asset and lease liability accounting', color: '#ec4899' },
+  { value: 'general_ledger', label: 'General Ledger',                  sub: 'Manual journals, allocations, periodic entries', color: '#94a3b8' },
+];
+
 export default function ContextSelector({ context, setContext }) {
   const set = (key, value) => setContext(prev => ({ ...prev, [key]: value }));
 
+  const activeModule = MODULES.find(m => m.value === context.module) || MODULES[0];
+
   return (
     <div>
-      <PageTitle title="Diagnostic Context" sub="Define the module, country, GAAP framework, and PMA toggle. All diagnostic rules will adapt accordingly." />
+      <PageTitle
+        title="Diagnostic Context"
+        sub="Select the D365 Finance module, country, GAAP framework, and regulatory options. All diagnostic rules load automatically from the module plugin pack."
+      />
 
       <div style={S.grid}>
         {/* Module */}
-        <FieldCard title="Module" icon="⚙">
-          <Radio name="module" value="lease"        label="Lease"        sub="IFRS 16 / ASC 842"  current={context.module} onChange={v => set('module', v)} />
-          <Radio name="module" value="fixed_assets" label="Fixed Assets" sub="IAS 16 / ASC 360"   current={context.module} onChange={v => set('module', v)} />
+        <FieldCard title="Module" icon="⚙" span={2}>
+          <div style={S.moduleGrid}>
+            {MODULES.map(m => (
+              <ModuleCard
+                key={m.value}
+                {...m}
+                active={context.module === m.value}
+                onClick={() => set('module', m.value)}
+              />
+            ))}
+          </div>
         </FieldCard>
 
         {/* Country */}
         <FieldCard title="Country" icon="🌍">
-          <Radio name="country" value="FR" label="France" sub="French PCG accounts" current={context.country} onChange={v => set('country', v)} />
-          <Radio name="country" value="US" label="United States" sub="US D365 chart of accounts" current={context.country} onChange={v => set('country', v)} />
+          <Radio name="country" value="FR" label="France"          sub="French PCG accounts (Plan Comptable Général)" current={context.country} onChange={v => set('country', v)} />
+          <Radio name="country" value="US" label="United States"   sub="US GAAP D365 chart of accounts"              current={context.country} onChange={v => set('country', v)} />
         </FieldCard>
 
         {/* GAAP */}
         <FieldCard title="GAAP Framework" icon="📚">
           <Radio name="gaap" value="french_gaap" label="French GAAP" sub="Plan Comptable Général (PCG)"              current={context.gaap} onChange={v => set('gaap', v)} />
-          <Radio name="gaap" value="us_gaap"     label="US GAAP"     sub="ASC 842 / ASC 360"                         current={context.gaap} onChange={v => set('gaap', v)} />
-          <Radio name="gaap" value="dual_gaap"   label="Dual GAAP"   sub="French statutory + IFRS reporting layer"   current={context.gaap} onChange={v => set('gaap', v)} />
+          <Radio name="gaap" value="us_gaap"     label="US GAAP"     sub="ASC 842 / ASC 360 / US GAAP"              current={context.gaap} onChange={v => set('gaap', v)} />
+          <Radio name="gaap" value="dual_gaap"   label="Dual GAAP"   sub="French statutory + IFRS reporting layer"  current={context.gaap} onChange={v => set('gaap', v)} />
         </FieldCard>
 
         {/* PMA Toggle */}
-        <FieldCard title="PMA – Provision pour Mise en Amortissement" icon="🇫🇷">
+        <FieldCard title="PMA — Provision pour Mise en Amortissement" icon="🇫🇷" span={2}>
           <p style={S.pmaDesc}>
-            French regulatory feature requiring a provision entry (68725 DR / 1510 CR) alongside standard
-            depreciation. Only applicable under French GAAP with certain asset types.
+            French regulatory feature requiring a provision entry (68725 DR / 1510 CR) alongside standard depreciation.
+            Only applicable under French GAAP with Fixed Assets or Lease modules.
           </p>
           <label style={S.toggle}>
-            <input
-              type="checkbox"
-              checked={context.pma}
-              onChange={e => set('pma', e.target.checked)}
-              style={{ display: 'none' }}
-            />
+            <input type="checkbox" checked={context.pma} onChange={e => set('pma', e.target.checked)} style={{ display: 'none' }} />
             <div style={{ ...S.toggleTrack, background: context.pma ? '#3b82f6' : '#1e293b' }}>
               <div style={{ ...S.toggleThumb, left: context.pma ? '22px' : '2px' }} />
             </div>
@@ -48,7 +66,10 @@ export default function ContextSelector({ context, setContext }) {
             </span>
           </label>
           {context.gaap !== 'french_gaap' && context.pma && (
-            <div style={S.warn}>⚠ PMA is a French GAAP feature. Set GAAP to French GAAP for full rule coverage.</div>
+            <div style={S.warn}>PMA is a French GAAP feature. Set GAAP to French GAAP for full rule coverage.</div>
+          )}
+          {!['fixed_assets','lease'].includes(context.module) && context.pma && (
+            <div style={S.warn}>PMA is only applicable in Fixed Assets and Lease modules.</div>
           )}
         </FieldCard>
       </div>
@@ -58,14 +79,14 @@ export default function ContextSelector({ context, setContext }) {
         <div style={S.summaryTitle}>Active Configuration</div>
         <div style={S.summaryRow}>
           {[
-            ['Module',  context.module === 'lease' ? 'Lease (IFRS 16)' : 'Fixed Assets'],
-            ['Country', context.country],
-            ['GAAP',    context.gaap.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())],
-            ['PMA',     context.pma ? 'Enabled' : 'Disabled'],
+            ['Module',   activeModule.label],
+            ['Country',  context.country],
+            ['GAAP',     context.gaap?.replace(/_/g, ' ')?.replace(/\b\w/g, c => c.toUpperCase())],
+            ['PMA',      context.pma ? 'Enabled' : 'Disabled'],
           ].map(([k, v]) => (
             <div key={k} style={S.summaryItem}>
               <span style={S.summaryKey}>{k}</span>
-              <span style={S.summaryVal}>{v}</span>
+              <span style={{ ...S.summaryVal, color: k === 'Module' ? activeModule.color : '#e2e8f0' }}>{v}</span>
             </div>
           ))}
         </div>
@@ -78,19 +99,52 @@ function PageTitle({ title, sub }) {
   return (
     <div style={{ marginBottom: 24 }}>
       <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e2e8f0', marginBottom: 6 }}>{title}</h1>
-      <p style={{ fontSize: 13, color: '#64748b', maxWidth: 600 }}>{sub}</p>
+      <p style={{ fontSize: 13, color: '#64748b', maxWidth: 640 }}>{sub}</p>
     </div>
   );
 }
 
-function FieldCard({ title, icon, children }) {
+function FieldCard({ title, icon, children, span = 1 }) {
   return (
-    <div className="card">
+    <div className="card" style={span === 2 ? { gridColumn: 'span 2' } : {}}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <span style={{ fontSize: 18 }}>{icon}</span>
         <span className="section-title" style={{ marginBottom: 0 }}>{title}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>
+    </div>
+  );
+}
+
+function ModuleCard({ value, label, sub, color, active, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        ...S.moduleCard,
+        border: active ? `2px solid ${color}` : '2px solid #1e293b',
+        background: active ? '#0f172a' : 'transparent',
+        cursor: 'pointer',
+      }}
+    >
+      <div style={{
+        width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+        background: active ? color : '#1e293b',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 11, fontWeight: 700, color: active ? '#fff' : '#475569',
+        letterSpacing: 0.5,
+      }}>
+        {value === 'pma'            ? 'PMA' :
+         value === 'procurement'    ? 'P2P' :
+         value === 'sales'          ? 'O2C' :
+         value === 'fixed_assets'   ? 'FA'  :
+         value === 'inventory'      ? 'INV' :
+         value === 'lease'          ? 'LSE' : 'GL'}
+      </div>
+      <div>
+        <div style={{ fontSize: 12, fontWeight: active ? 700 : 500, color: active ? '#e2e8f0' : '#94a3b8' }}>{label}</div>
+        <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>{sub}</div>
+      </div>
     </div>
   );
 }
@@ -111,6 +165,11 @@ function Radio({ name, value, label, sub, current, onChange }) {
 
 const S = {
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 },
+  moduleGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 },
+  moduleCard: {
+    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+    borderRadius: 8, transition: 'all .15s',
+  },
   radio: {
     display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
     borderRadius: 6, cursor: 'pointer', border: '1px solid transparent', transition: 'all .15s',
@@ -124,17 +183,12 @@ const S = {
   pmaDesc: { fontSize: 12, color: '#64748b', lineHeight: 1.6, marginBottom: 14 },
   toggle: { display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' },
   toggleTrack: { width: 42, height: 22, borderRadius: 999, position: 'relative', transition: 'background .2s', flexShrink: 0 },
-  toggleThumb: {
-    position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%',
-    background: '#fff', transition: 'left .2s',
-  },
+  toggleThumb: { position: 'absolute', top: 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' },
   warn: {
     marginTop: 10, padding: '8px 12px', background: '#422006', border: '1px solid #854d0e',
     borderRadius: 6, fontSize: 12, color: '#fcd34d',
   },
-  summary: {
-    background: '#0d1219', border: '1px solid #1e293b', borderRadius: 10, padding: '16px 20px',
-  },
+  summary: { background: '#0d1219', border: '1px solid #1e293b', borderRadius: 10, padding: '16px 20px' },
   summaryTitle: { fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#475569', textTransform: 'uppercase', marginBottom: 12 },
   summaryRow: { display: 'flex', gap: 32, flexWrap: 'wrap' },
   summaryItem: { display: 'flex', flexDirection: 'column', gap: 3 },

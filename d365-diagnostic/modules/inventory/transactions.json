@@ -1,0 +1,61 @@
+{
+  "Issue": {
+    "label": "Inventory Issue / Consumption",
+    "description": "Stock consumed in production, sold to a customer, or transferred out — COGS/consumption account debited, inventory account credited.",
+    "detection": {
+      "debitPrefixes":  ["607","6037","603","60"],
+      "creditPrefixes": ["311","315","341","351","355","371","31","35","37"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["607","6037","603","60"], "label": "COGS / Consumption / Stock Variation" },
+      { "gaap": "all", "side": "credit", "accounts": ["311","315","341","351","355","371"], "label": "Inventory (Balance Sheet)" }
+    ],
+    "knownErrors": {
+      "401": { "shouldBe": ["311"], "detail": "Vendor payable (401) credited on an inventory issue — should credit inventory account (311-371). Check Inventory Posting Profile." }
+    }
+  },
+
+  "Receipt": {
+    "label": "Inventory Receipt",
+    "description": "Stock received from a supplier or from production — inventory account debited, interim receipt or payable account credited.",
+    "detection": {
+      "debitPrefixes":  ["311","315","341","351","355","371","31","35","37"],
+      "creditPrefixes": ["408","401","40"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["311","315","341","351","355","371"], "label": "Inventory (Balance Sheet)" },
+      { "gaap": "all", "side": "credit", "accounts": ["408","401"], "label": "Accrual / Payable Offset" }
+    ],
+    "knownErrors": {
+      "401": { "shouldBe": ["408"], "detail": "Trade payable (401) used for a receipt accrual — uninvoiced receipts should use 408. The AP invoice matching will fail." }
+    }
+  },
+
+  "Transfer": {
+    "label": "Inventory Transfer",
+    "description": "Movement of stock between warehouses, locations, or legal entities — inventory account debited (destination) and credited (source) with same value.",
+    "detection": {
+      "debitPrefixes":  ["311","315","341","351","355","371","31","37","38"],
+      "creditPrefixes": ["311","315","341","351","355","371","31","37","38"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["311","315","341","351","355","371","38"], "label": "Destination Inventory Account" },
+      { "gaap": "all", "side": "credit", "accounts": ["311","315","341","351","355","371","38"], "label": "Source Inventory Account" }
+    ],
+    "knownErrors": {}
+  },
+
+  "Adjustment": {
+    "label": "Inventory Adjustment",
+    "description": "Write-up or write-down of inventory following a physical count or valuation change.",
+    "detection": {
+      "debitPrefixes":  ["311","315","341","351","355","371","603","697"],
+      "creditPrefixes": ["311","315","341","351","355","371","603","697"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["311","315","341","351","355","371","603","697"], "label": "Inventory / Adjustment Expense" },
+      { "gaap": "all", "side": "credit", "accounts": ["311","315","341","351","355","371","603","697"], "label": "Inventory / Adjustment Credit" }
+    ],
+    "knownErrors": {}
+  }
+}

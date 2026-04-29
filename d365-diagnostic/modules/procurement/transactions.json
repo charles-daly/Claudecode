@@ -1,0 +1,48 @@
+{
+  "Invoice": {
+    "label": "Vendor Invoice",
+    "description": "Standard vendor invoice posting — purchase expense or inventory debit against trade payables credit (401).",
+    "detection": {
+      "debitPrefixes":  ["60","61","62","63","31","32","33","34","35","37","21"],
+      "creditPrefixes": ["401","404"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["60","61","62","63","31","32","33","34","35","37","21"], "label": "Purchase Expense / Inventory / Fixed Asset" },
+      { "gaap": "all", "side": "credit", "accounts": ["401","404"], "label": "Trade Payables / FA Supplier Payable" }
+    ],
+    "knownErrors": {
+      "401": { "shouldBe": ["404"], "detail": "General trade payable (401) used for a fixed asset invoice — should use FA supplier payable (404). Check Fixed Asset Posting Profile acquisition offset account." },
+      "408": { "shouldBe": ["401"], "detail": "Accrual account (408) credited on a matched invoice — invoice posting should clear 408 and credit 401, not create a new 408 balance." }
+    }
+  },
+
+  "Accrual": {
+    "label": "Receipt Accrual (Uninvoiced)",
+    "description": "Goods receipt without invoice — expense or inventory debited, accrued invoices (408) credited. Reversed when the vendor invoice arrives.",
+    "detection": {
+      "debitPrefixes":  ["60","61","62","31","32","33","34","35","37"],
+      "creditPrefixes": ["408"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["60","61","62","31","32","33","34","35","37"], "label": "Purchase Expense / Inventory" },
+      { "gaap": "all", "side": "credit", "accounts": ["408"], "label": "Accrued Invoices — Suppliers (408)" }
+    ],
+    "knownErrors": {
+      "401": { "shouldBe": ["408"], "detail": "Trade payable (401) used for a receipt accrual — uninvoiced receipts must use 408 (fournisseurs: factures non parvenues). The invoice matching process will fail if 408 is not used." }
+    }
+  },
+
+  "ProductReceipt": {
+    "label": "Product Receipt (GRN)",
+    "description": "Goods receipt note posting — inventory or purchase expenditure debited, interim receipt account credited.",
+    "detection": {
+      "debitPrefixes":  ["31","32","33","34","35","37"],
+      "creditPrefixes": ["408","401","40"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["311","315","341","351","355","371","31","37"], "label": "Inventory (Raw Materials / Goods)" },
+      { "gaap": "all", "side": "credit", "accounts": ["408","401"], "label": "Accrual / Payable Offset" }
+    ],
+    "knownErrors": {}
+  }
+}

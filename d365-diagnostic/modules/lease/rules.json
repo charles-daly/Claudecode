@@ -1,0 +1,29 @@
+{
+  "_meta": { "module": "lease", "label": "Lease (IFRS 16 / ASC 842)" },
+
+  "LeaseCommencement": {
+    "label": "Lease Initial Recognition",
+    "debit":  ["LeasePostingProfile", "LeaseBook", "AssetGroup", "LedgerMapping"],
+    "credit": ["LeasePostingProfile", "LeaseBook", "LedgerMapping"]
+  },
+  "Depreciation": {
+    "label": "Monthly ROU Asset Depreciation",
+    "debit":  ["FrenchRegulatoryParameters", "LeasePostingProfile", "LeaseBook", "AssetGroup", "LedgerMapping"],
+    "credit": ["FrenchRegulatoryParameters", "LeasePostingProfile", "LeaseBook", "AssetGroup", "LedgerMapping"]
+  },
+  "InterestAccrual": {
+    "label": "Lease Interest Accrual",
+    "debit":  ["LeasePostingProfile", "LeaseBook", "LedgerMapping"],
+    "credit": ["LeasePostingProfile", "LeaseBook", "LedgerMapping"]
+  },
+  "Payment": {
+    "label": "Lease Payment (Principal + Interest Settlement)",
+    "debit":  ["LeasePostingProfile", "LeaseBook", "LedgerMapping"],
+    "credit": ["BankAccountSetup", "LedgerMapping"]
+  },
+  "VariablePayment": {
+    "label": "Variable / Short-term Lease Expense",
+    "debit":  ["LeasePostingProfile", "LedgerMapping"],
+    "credit": ["BankAccountSetup", "VendorPostingProfile", "LedgerMapping"]
+  }
+}

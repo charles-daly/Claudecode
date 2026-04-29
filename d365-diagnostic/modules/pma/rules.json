@@ -1,0 +1,19 @@
+{
+  "_meta": { "module": "pma", "label": "Project Management & Accounting" },
+
+  "Expense": {
+    "label": "Project Expense",
+    "debit":  ["ProjectPostingProfile", "ProjectCategory", "LedgerMapping"],
+    "credit": ["VendorPostingProfile", "PayrollPosting", "BankAccountSetup", "LedgerMapping"]
+  },
+  "Revenue": {
+    "label": "Project Revenue Recognition",
+    "debit":  ["CustomerPostingProfile", "RevenueRecognition", "LedgerMapping"],
+    "credit": ["ProjectPostingProfile", "RevenueRecognition", "ProjectCategory", "LedgerMapping"]
+  },
+  "WIP": {
+    "label": "Work-In-Progress Accumulation / Recognition",
+    "debit":  ["WIPPostingSetup", "ProjectPostingProfile", "LedgerMapping"],
+    "credit": ["WIPPostingSetup", "ProjectPostingProfile", "LedgerMapping"]
+  }
+}

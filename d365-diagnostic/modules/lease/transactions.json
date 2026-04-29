@@ -1,0 +1,92 @@
+{
+  "LeaseCommencement": {
+    "label": "Lease Initial Recognition",
+    "description": "ROU asset recognised on the balance sheet at lease commencement date — asset debited, lease liability credited at present value of future payments.",
+    "detection": {
+      "debitPrefixes":  ["231","232","2318","2319","2321","2328","152"],
+      "creditPrefixes": ["168","1681","1682","210","211"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["2318","2319","2321","2328","231"], "label": "ROU Asset (IFRS 16)" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["1681","1682"],                     "label": "Lease Liability" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["152000","152100"],                 "label": "ROU Asset" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["210000","210100","211000","211100"],"label": "Lease Liability" }
+    ],
+    "knownErrors": {
+      "6181": { "shouldBe": ["2318","2319","2321"], "detail": "Short-term / operating lease expense account (6181) posted at commencement — this is a finance lease that requires an ROU asset. Reclassify in D365 Lease setup." }
+    }
+  },
+
+  "Depreciation": {
+    "label": "Monthly ROU Asset Depreciation",
+    "description": "Monthly depreciation of the right-of-use asset — charge debited to P&L, accumulated depreciation credited. Under French GAAP with PMA enabled, an additional provision entry (68725 / 1510) is required.",
+    "detection": {
+      "debitPrefixes":  ["6811","6812","510"],
+      "creditPrefixes": ["2818","28154","28182","159"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["6811","6812"],            "label": "Depreciation Charge" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["2818","28154","28182"],   "label": "Accumulated Depreciation — ROU" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["510100","510200"],        "label": "Depreciation / Amortisation Expense" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["159100","159200"],        "label": "Accumulated Depreciation — ROU" }
+    ],
+    "pmaEntries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["68725","6872"], "label": "PMA Provision Charge" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["1510","15"],    "label": "PMA Reserve" }
+    ],
+    "knownErrors": {
+      "661":  { "shouldBe": ["6618"], "detail": "General interest account (661) used instead of lease interest (6618). Update the Lease Posting Profile Interest Expense Account." },
+      "6615": { "shouldBe": ["6618"], "detail": "Current account interest (6615) posted instead of IFRS 16 lease interest (6618). Likely a wrong posting profile selection." }
+    }
+  },
+
+  "InterestAccrual": {
+    "label": "Lease Interest Accrual",
+    "description": "Monthly unwinding of the discount on the lease liability using the effective interest method — interest expense debited, interest payable credited.",
+    "detection": {
+      "debitPrefixes":  ["661","6615","6618","600"],
+      "creditPrefixes": ["168","1688","16881","215"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["6618"],          "label": "Lease Interest Expense (IFRS 16)" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["1688","16881"],  "label": "Interest Payable on Lease" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["600100"],        "label": "Finance Lease Interest Expense" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["215000"],        "label": "Interest Payable" }
+    ],
+    "knownErrors": {
+      "661":  { "shouldBe": ["6618"], "detail": "General interest expense (661) used for lease interest — use IFRS 16-specific account 6618. Update Lease Posting Profile." },
+      "6615": { "shouldBe": ["6618"], "detail": "Current account interest (6615) posted instead of IFRS 16 lease interest (6618). Likely a wrong posting profile selection." },
+      "6181": { "shouldBe": ["6618"], "detail": "Operating lease expense account (6181) posted for a finance lease interest accrual. Check lease classification in D365." }
+    }
+  },
+
+  "Payment": {
+    "label": "Lease Payment",
+    "description": "Cash payment of a lease instalment — lease liability debited (principal portion), bank account credited.",
+    "detection": {
+      "debitPrefixes":  ["168","1681","16881","210","211"],
+      "creditPrefixes": ["512","100"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["1681","1682","16881"], "label": "Lease Liability (principal reduction)" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["512"],                 "label": "Bank — Current Account" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["210000","210100","211000","211100"], "label": "Lease Liability" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["100000"],              "label": "Cash" }
+    ],
+    "knownErrors": {}
+  },
+
+  "VariablePayment": {
+    "label": "Variable / Short-term Lease Payment",
+    "description": "Expense-basis payment for variable leases or short-term / low-value leases not on-balance-sheet — expense debited directly, bank or vendor credited.",
+    "detection": {
+      "debitPrefixes":  ["6154","6156","6181","615","61"],
+      "creditPrefixes": ["512","401","100","200"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["6154","6156","6181","615"], "label": "Lease / Rental Expense" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["512","401"],                "label": "Bank / Vendor Payable" }
+    ],
+    "knownErrors": {}
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "_meta": { "module": "procurement", "label": "Procurement (Procure-to-Pay)" },
+
+  "Invoice": {
+    "label": "Vendor Invoice",
+    "debit":  ["ItemGroupPosting", "ProcurementCategory", "LedgerMapping"],
+    "credit": ["VendorPostingProfile", "LedgerMapping"]
+  },
+  "Accrual": {
+    "label": "Receipt Accrual (Uninvoiced)",
+    "debit":  ["ItemGroupPosting", "AccrualSetup", "LedgerMapping"],
+    "credit": ["AccrualSetup", "VendorPostingProfile", "LedgerMapping"]
+  },
+  "ProductReceipt": {
+    "label": "Product Receipt (GRN)",
+    "debit":  ["ItemGroupPosting", "LedgerMapping"],
+    "credit": ["AccrualSetup", "ItemGroupPosting", "LedgerMapping"]
+  }
+}

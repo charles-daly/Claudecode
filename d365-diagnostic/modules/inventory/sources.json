@@ -1,0 +1,61 @@
+{
+  "InventoryPostingProfile": {
+    "applicableModules": ["inventory"],
+    "description": "Inventory posting profile (configured within the Posting setup in Inventory Management) defines the ledger accounts for all inventory movement types: receipts, issues, transfers, and adjustments. This is the primary source for all inventory account errors.",
+    "d365Path": "Inventory Management > Setup > Posting > Posting",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Inventory Account": {
+        "description": "Balance sheet asset account for stocked inventory (raw materials, WIP, finished goods, goods for resale)",
+        "accountPrefixes": { "FR": ["31","32","33","34","35","37","38"], "US": ["140","141"] },
+        "canonicalPrefixes": { "FR": ["311","315","341","351","355","371"], "US": ["140000","141000"] }
+      },
+      "Inventory Issue (COGS) Account": {
+        "description": "Expense account debited when inventory is consumed or shipped to a customer",
+        "accountPrefixes": { "FR": ["607","603","6037","60"], "US": ["500"] },
+        "canonicalPrefixes": { "FR": ["607","6037"], "US": ["500100"] }
+      },
+      "Inventory Receipt Offset Account": {
+        "description": "Interim account used when inventory is received — offset before AP invoice is posted",
+        "accountPrefixes": { "FR": ["408","40"], "US": ["205","200"] },
+        "canonicalPrefixes": { "FR": ["408"], "US": ["205000"] }
+      },
+      "Inventory Adjustment Account": {
+        "description": "Account used for inventory write-ups, write-downs, and physical count adjustments",
+        "accountPrefixes": { "FR": ["603","697","79"], "US": ["500","600"] },
+        "canonicalPrefixes": { "FR": ["6037","697"], "US": ["500100"] }
+      }
+    }
+  },
+
+  "ItemGroup": {
+    "applicableModules": ["inventory"],
+    "description": "Item group configuration allows account overrides at the group level. When the inventory posting profile is correctly set up but specific item groups still post to wrong accounts, investigate item group account overrides here.",
+    "d365Path": "Inventory Management > Setup > Inventory > Item Groups",
+    "priority": 2,
+    "confidence": "Medium",
+    "fields": {
+      "Item Group Inventory Account Override": {
+        "description": "Group-level override for the balance sheet inventory account",
+        "accountPrefixes": { "FR": ["31","32","33","34","35","37"], "US": ["140","141"] },
+        "canonicalPrefixes": { "FR": ["311","355","371"], "US": ["140000"] }
+      }
+    }
+  },
+
+  "LedgerMapping": {
+    "applicableModules": ["inventory"],
+    "description": "Chart of accounts main account — the fallback source. When no inventory-specific posting profile matches, the entry likely originated from a manual GL journal bypassing Inventory Management module logic.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 99,
+    "confidence": "Low",
+    "fields": {
+      "Main Account (Direct GL)": {
+        "description": "Direct chart of accounts reference — no module posting profile source detected",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  }
+}

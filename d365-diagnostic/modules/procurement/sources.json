@@ -1,0 +1,111 @@
+{
+  "ItemGroupPosting": {
+    "applicableModules": ["procurement", "sales", "inventory"],
+    "description": "Item group posting setup defines the ledger accounts for inventory and purchase transactions per item group. This is the primary source for purchase expenditure, inventory, COGS, and accrual accounts. It is the first place to investigate when purchase or inventory accounts are incorrect.",
+    "d365Path": "Inventory Management > Setup > Posting > Posting",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Purchase Expenditure Account": {
+        "description": "Expense account debited when a vendor invoice is posted for non-stocked items or services",
+        "accountPrefixes": { "FR": ["60","61","62"], "US": ["500","510"] },
+        "canonicalPrefixes": { "FR": ["601","602","604","607","615","621"], "US": ["500100","510100"] }
+      },
+      "Inventory Account": {
+        "description": "Balance sheet stock account debited on product receipt for stocked items",
+        "accountPrefixes": { "FR": ["31","32","33","34","35","37","38"], "US": ["140","141"] },
+        "canonicalPrefixes": { "FR": ["311","315","341","351","355","371"], "US": ["140000","141000"] }
+      },
+      "Purchase Accrual Account": {
+        "description": "Uninvoiced receipts accrual — credited at goods receipt when invoice has not yet arrived",
+        "accountPrefixes": { "FR": ["408"], "US": ["205"] },
+        "canonicalPrefixes": { "FR": ["408"], "US": ["205000"] }
+      },
+      "Cost of Goods Sold Account": {
+        "description": "COGS account debited on inventory issue or sales shipment",
+        "accountPrefixes": { "FR": ["607","603","6037"], "US": ["500"] },
+        "canonicalPrefixes": { "FR": ["607","6037"], "US": ["500100"] }
+      },
+      "Inventory Issue Account": {
+        "description": "Offset account for inventory consumption — mirrors COGS movement",
+        "accountPrefixes": { "FR": ["31","35","37"], "US": ["140"] },
+        "canonicalPrefixes": { "FR": ["311","355","371"], "US": ["140000"] }
+      }
+    }
+  },
+
+  "ProcurementCategory": {
+    "applicableModules": ["procurement"],
+    "description": "Procurement category hierarchy allows account routing based on the category of goods or services purchased. Category-level account overrides take precedence over the item group posting setup. Investigate this source when specific categories of purchases post to unexpected accounts.",
+    "d365Path": "Procurement and Sourcing > Procurement Categories > Procurement Category Hierarchy",
+    "priority": 2,
+    "confidence": "High",
+    "fields": {
+      "Category Main Account": {
+        "description": "Account used for purchases within this procurement category",
+        "accountPrefixes": { "FR": ["60","61","62","63"], "US": ["500","510","520"] },
+        "canonicalPrefixes": { "FR": ["601","602","621","622"], "US": ["500100"] }
+      }
+    }
+  },
+
+  "VendorPostingProfile": {
+    "applicableModules": ["procurement", "pma"],
+    "description": "Accounts Payable vendor posting profile defines the summary AP account used when vendor invoices are posted. The summary account (401 in French PCG) is the credit side of all vendor invoice transactions. If a general trade-payable account is used where an FA-specific account (404) is expected, this indicates the transaction was routed through AP rather than the Fixed Assets acquisition workflow.",
+    "d365Path": "Accounts Payable > Setup > Vendor Posting Profiles",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Trade Payables Summary Account": {
+        "description": "General supplier payable account — the primary AP control account",
+        "accountPrefixes": { "FR": ["401","403"], "US": ["200"] },
+        "canonicalPrefixes": { "FR": ["401"], "US": ["200000"] }
+      },
+      "Accrual Account": {
+        "description": "Account for uninvoiced receipt accruals (GRN without invoice)",
+        "accountPrefixes": { "FR": ["408"], "US": ["205"] },
+        "canonicalPrefixes": { "FR": ["408"], "US": ["205000"] }
+      },
+      "Prepayment Account": {
+        "description": "Account for vendor prepayments (advances)",
+        "accountPrefixes": { "FR": ["409","4091"], "US": ["206"] },
+        "canonicalPrefixes": { "FR": ["409"], "US": ["206000"] }
+      }
+    }
+  },
+
+  "AccrualSetup": {
+    "applicableModules": ["procurement"],
+    "description": "Accounts Payable accrual setup configures how uninvoiced receipts are accrued on the balance sheet. The accrual account (408) is used to bridge the time between goods receipt and vendor invoice posting. Investigate this source when receipt accruals are missing or posted to the wrong account.",
+    "d365Path": "Accounts Payable > Setup > Accruals",
+    "priority": 2,
+    "confidence": "High",
+    "fields": {
+      "Accrual Account": {
+        "description": "Balance sheet liability account for uninvoiced goods receipts (408 in French PCG)",
+        "accountPrefixes": { "FR": ["408"], "US": ["205"] },
+        "canonicalPrefixes": { "FR": ["408"], "US": ["205000"] }
+      },
+      "Accrual Offset Account": {
+        "description": "Expense account offset used in the accrual entry",
+        "accountPrefixes": { "FR": ["60","61","62"], "US": ["500"] },
+        "canonicalPrefixes": { "FR": ["601","602","607"], "US": ["500100"] }
+      }
+    }
+  },
+
+  "LedgerMapping": {
+    "applicableModules": ["procurement"],
+    "description": "Chart of accounts main account — the fallback source. When no procurement-specific posting profile matches, the entry likely originated from a manual GL journal bypassing module logic.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 99,
+    "confidence": "Low",
+    "fields": {
+      "Main Account (Direct GL)": {
+        "description": "Direct chart of accounts reference — no module posting profile source detected",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  }
+}

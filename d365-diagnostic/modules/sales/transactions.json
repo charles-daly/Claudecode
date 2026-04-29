@@ -1,0 +1,51 @@
+{
+  "Invoice": {
+    "label": "Customer Invoice",
+    "description": "Customer invoice posting — trade receivables (411) debited, revenue and/or deferred revenue credited.",
+    "detection": {
+      "debitPrefixes":  ["411","418"],
+      "creditPrefixes": ["701","706","707","708","487","70"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["411","418"], "label": "Trade Receivables / Accrued Revenue" },
+      { "gaap": "all", "side": "credit", "accounts": ["701","706","707","708","487"], "label": "Revenue / Deferred Revenue" }
+    ],
+    "knownErrors": {
+      "419": { "shouldBe": ["411"], "detail": "Customer advance account (419) used instead of trade receivables (411) — check customer posting profile." },
+      "487": { "shouldBe": ["701"], "detail": "Revenue deferred (487) on invoice but Revenue Recognition module may not be enabled — verify Revenue Recognition setup if deferral is unintended." }
+    }
+  },
+
+  "Revenue": {
+    "label": "Revenue Recognition",
+    "description": "Release of deferred revenue to the P&L income statement upon meeting recognition criteria.",
+    "detection": {
+      "debitPrefixes":  ["487"],
+      "creditPrefixes": ["701","706","707","708","70"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["487"], "label": "Deferred Revenue Release (487)" },
+      { "gaap": "all", "side": "credit", "accounts": ["701","706","707","708"], "label": "Recognised Revenue" }
+    ],
+    "knownErrors": {
+      "411": { "shouldBe": ["487"], "detail": "AR account (411) debited on a revenue recognition entry — recognition should release 487 deferred revenue, not create a new AR balance." }
+    }
+  },
+
+  "COGS": {
+    "label": "Cost of Goods Sold",
+    "description": "Inventory issue on shipment — COGS expense debited, inventory balance sheet account credited.",
+    "detection": {
+      "debitPrefixes":  ["607","6037","603","60"],
+      "creditPrefixes": ["311","315","341","351","355","371","31","35","37"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["607","6037","603"], "label": "Cost of Goods Sold / Variation of Stock" },
+      { "gaap": "all", "side": "credit", "accounts": ["311","315","341","351","355","371"], "label": "Inventory (Stock Account)" }
+    ],
+    "knownErrors": {
+      "601": { "shouldBe": ["607"], "detail": "Raw material purchase account (601) used for COGS — COGS should reflect stock movement (607/6037). Check Item Group Posting COGS account." },
+      "401": { "shouldBe": ["311"], "detail": "Vendor payable (401) credited on a COGS entry — inventory account (311-371) should be credited, not a payable." }
+    }
+  }
+}

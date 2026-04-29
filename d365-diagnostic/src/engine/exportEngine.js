@@ -8,6 +8,7 @@ const {
 const fs = require('fs');
 const { ROOT_CAUSES } = require('./accountingRules');
 const { traceToText, confidenceLabel } = require('./accountSourceResolver');
+const { moduleLoader } = require('./moduleLoader');
 
 // ─── Shared style constants ───────────────────────────────────────────────────
 const C = {
@@ -39,16 +40,17 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
 
   if (diagnosticResult.voucherAnalysis) {
     Object.entries(diagnosticResult.voucherAnalysis).forEach(([name, data]) =>
-      addVoucherSheet(wb, data, name)
+      addVoucherSheet(wb, data, name, context)
     );
   }
 
   if (diagnosticResult.scenarioAnalysis) {
-    addScenarioSheet(wb, diagnosticResult.scenarioAnalysis);
+    addScenarioSheet(wb, diagnosticResult.scenarioAnalysis, context);
   }
 
   addRootCauseSheet(wb, diagnosticResult.summary);
   addAccountSourceSheet(wb, diagnosticResult);
+  addUniversalModelSheet(wb, diagnosticResult);
 
   await wb.xlsx.writeFile(filePath);
 }
@@ -95,7 +97,8 @@ function addSummarySheet(wb, result, context) {
   };
 
   section('CONTEXT');
-  row2('Module',       context.module || 'N/A');
+  const modMeta = moduleLoader.loadModule(context.module || 'lease').metadata;
+  row2('Module',       modMeta.label || context.module || 'N/A');
   row2('Country',      context.country || 'N/A');
   row2('GAAP',         context.gaap || 'N/A');
   row2('PMA Active',   context.pma ? 'Yes' : 'No');
@@ -122,15 +125,18 @@ function addSummarySheet(wb, result, context) {
 }
 
 // ─── Voucher sheet ────────────────────────────────────────────────────────────
-function addVoucherSheet(wb, sheetData, sheetName) {
+function addVoucherSheet(wb, sheetData, sheetName, context) {
   const ws = wb.addWorksheet(('Vouchers - ' + sheetName).slice(0, 31));
+  const modMeta = moduleLoader.loadModule(context?.module || 'lease').metadata;
 
   ws.columns = [
     { header: 'Voucher ID',    key: 'voucherId',    width: 20 },
     { header: 'Date',          key: 'date',          width: 14 },
+    { header: 'Module',        key: 'module',        width: 22 },
     { header: 'Status',        key: 'status',        width: 11 },
     { header: 'Severity',      key: 'severity',      width: 11 },
     { header: 'Detected Type', key: 'detectedType',  width: 22 },
+    { header: 'Account Source',key: 'accountSource', width: 26 },
     { header: 'Total Debit',   key: 'totalDebit',    width: 14 },
     { header: 'Total Credit',  key: 'totalCredit',   width: 14 },
     { header: 'Balanced',      key: 'isBalanced',    width: 10 },
@@ -146,35 +152,41 @@ function addVoucherSheet(wb, sheetData, sheetName) {
   ws.getRow(1).height = 24;
 
   sheetData.vouchers.forEach(v => {
+    const topSrc = v.issues.find(i => i.actualSource)?.actualSource?.source || '–';
     const row = ws.addRow({
-      voucherId:   v.voucherId,
-      date:        v.date || '',
-      status:      v.status,
-      severity:    v.severity,
+      voucherId:    v.voucherId,
+      date:         v.date || '',
+      module:       modMeta.label || context?.module || '–',
+      status:       v.status,
+      severity:     v.severity,
       detectedType: v.detectedType || 'unknown',
-      totalDebit:  v.totalDebit,
-      totalCredit: v.totalCredit,
-      isBalanced:  v.isBalanced ? 'YES' : 'NO',
-      issueCount:  v.issues.length,
+      accountSource:topSrc,
+      totalDebit:   v.totalDebit,
+      totalCredit:  v.totalCredit,
+      isBalanced:   v.isBalanced ? 'YES' : 'NO',
+      issueCount:   v.issues.length,
       issueSummary: v.issues.map(i => `[${i.severity?.toUpperCase()}] ${i.title}`).join(' | '),
     });
     row.getCell('totalDebit').numFmt  = '#,##0.00';
     row.getCell('totalCredit').numFmt = '#,##0.00';
 
-    if (v.severity === 'critical')       row.fill = fill('FFFEE2E2');
-    else if (v.severity === 'high')      row.fill = fill('FFFFF7ED');
-    else if (v.status   === 'clean')     row.fill = fill('FFF0FFF4');
+    if (v.severity === 'critical')   row.fill = fill('FFFEE2E2');
+    else if (v.severity === 'high')  row.fill = fill('FFFFF7ED');
+    else if (v.status   === 'clean') row.fill = fill('FFF0FFF4');
   });
 
-  ws.autoFilter = { from: 'A1', to: 'J1' };
+  ws.autoFilter = { from: 'A1', to: 'L1' };
 }
 
 // ─── Scenario sheet ───────────────────────────────────────────────────────────
-function addScenarioSheet(wb, scenarioAnalysis) {
+function addScenarioSheet(wb, scenarioAnalysis, context) {
   const ws = wb.addWorksheet('Scenario Analysis');
+  const modMeta = moduleLoader.loadModule(context?.module || 'lease').metadata;
   ws.columns = [
     { header: 'Scenario',          key: 'description',     width: 32 },
+    { header: 'Module',            key: 'module',          width: 22 },
     { header: 'Transaction Type',  key: 'transactionType', width: 22 },
+    { header: 'Account Source',    key: 'accountSource',   width: 26 },
     { header: 'Status',            key: 'status',          width: 12 },
     { header: '# Issues',          key: 'issueCount',      width: 10 },
     { header: 'Issue Details',     key: 'issueDetails',    width: 90 },
@@ -187,9 +199,12 @@ function addScenarioSheet(wb, scenarioAnalysis) {
   });
 
   scenarioAnalysis.findings.forEach(f => {
+    const topSrc = f.issues.find(i => i.actualSource)?.actualSource?.source || '–';
     const row = ws.addRow({
       description:     f.description,
+      module:          modMeta.label || context?.module || '–',
       transactionType: f.transactionType || 'N/A',
+      accountSource:   topSrc,
       status:          f.status,
       issueCount:      f.issues.length,
       issueDetails:    f.issues.map(i => `[${i.severity?.toUpperCase()}] ${i.title}: ${i.detail}`).join('\n'),
@@ -258,28 +273,32 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
         ctxTable(context),
         spacer(),
 
-        heading2('2.  EXECUTIVE SUMMARY'),
+        heading2('2.  MODULE'),
+        moduleInfoSection(context),
+        spacer(),
+
+        heading2('3.  EXECUTIVE SUMMARY'),
         para2('Overall Status: ', (s.overallStatus || 'CLEAN').toUpperCase(), statusColor),
         summaryTable(s),
         spacer(),
 
-        heading2('3.  ROOT CAUSE ANALYSIS'),
+        heading2('4.  ROOT CAUSE ANALYSIS'),
         ...rootCauseSection(s),
 
         ...(diagnosticResult.voucherAnalysis ? [
-          heading2('4.  VOUCHER ANALYSIS'),
+          heading2('5.  VOUCHER ANALYSIS'),
           ...voucherSection(diagnosticResult.voucherAnalysis),
         ] : []),
 
         ...(diagnosticResult.scenarioAnalysis ? [
-          heading2('5.  SCENARIO ANALYSIS'),
+          heading2('6.  SCENARIO ANALYSIS'),
           ...scenarioSection(diagnosticResult.scenarioAnalysis),
         ] : []),
 
-        heading2('6.  ACCOUNT SOURCE DETERMINATION'),
+        heading2('7.  ACCOUNT SOURCE DETERMINATION'),
         ...accountSourceSection(diagnosticResult),
 
-        heading2('7.  D365 CONFIGURATION RECOMMENDATIONS'),
+        heading2('8.  D365 CONFIGURATION RECOMMENDATIONS'),
         ...recommendations(diagnosticResult, context),
 
         spacer(),
@@ -328,6 +347,28 @@ const bullet = (text) => new Paragraph({
   children: [new TextRun({ text, size: 20 })],
   spacing: { after: 60 },
 });
+
+function moduleInfoSection(ctx) {
+  try {
+    const mod = moduleLoader.loadModule(ctx?.module || 'lease');
+    const meta = mod.metadata;
+    const txTypes = Object.entries(mod.transactions || {});
+    const sources = Object.keys(mod.sources || {});
+
+    return new Table({
+      width: { size: 80, type: WidthType.PERCENTAGE },
+      rows: [
+        tRow(['Module', meta.label], false, true),
+        tRow(['Description', meta.description || '–'], false),
+        tRow(['Transaction Types', txTypes.map(([k, v]) => `${k} — ${v.label || ''}`).join(', ')], true),
+        tRow(['D365 Sources', sources.filter(s => s !== '_meta').join(', ')], false),
+        tRow(['Country / GAAP', `${ctx?.country || '–'} / ${ctx?.gaap || '–'}`], true),
+      ],
+    });
+  } catch (_) {
+    return para(`Module: ${ctx?.module || 'unknown'}`, { color: '888888' });
+  }
+}
 
 function ctxTable(ctx) {
   const rows = [
@@ -624,6 +665,81 @@ function accountSourceSection(diagnosticResult) {
   });
 
   return parts;
+}
+
+// ─── Universal Accounting Model sheet ────────────────────────────────────────
+function addUniversalModelSheet(wb, diagnosticResult) {
+  const ws = wb.addWorksheet('Universal Model');
+
+  ws.columns = [
+    { header: 'Source',          key: 'source',          width: 22 },
+    { header: 'Module',          key: 'module',          width: 22 },
+    { header: 'Transaction Type',key: 'transactionType', width: 22 },
+    { header: 'Posting Type',    key: 'postingType',     width: 12 },
+    { header: 'Account Source',  key: 'accountSource',   width: 26 },
+    { header: 'Config Element',  key: 'configElement',   width: 30 },
+    { header: 'Main Account',    key: 'mainAccount',     width: 14 },
+    { header: 'Issue Type',      key: 'issueType',       width: 22 },
+    { header: 'Severity',        key: 'severity',        width: 12 },
+    { header: 'Detail',          key: 'detail',          width: 70 },
+    { header: 'Resolution Trace',key: 'trace',           width: 65 },
+  ];
+
+  ws.getRow(1).eachCell(cell => {
+    cell.fill = fill(C.navy);
+    cell.font = { bold: true, color: { argb: C.white } };
+    cell.alignment = { horizontal: 'center', wrapText: true };
+  });
+  ws.getRow(1).height = 28;
+
+  const rows = [];
+
+  const collect = (issues, sourceLabel) => {
+    issues.forEach(issue => {
+      const um = issue.universalModel || {};
+      rows.push({
+        source:          sourceLabel,
+        module:          um.module          || '–',
+        transactionType: um.transactionType || '–',
+        postingType:     um.postingType     || '–',
+        accountSource:   um.accountSource   || issue.actualSource?.source  || '–',
+        configElement:   um.configElement   || issue.actualSource?.field   || '–',
+        mainAccount:     um.mainAccount     || '–',
+        issueType:       issue.type,
+        severity:        issue.severity,
+        detail:          issue.detail || '',
+        trace:           issue.actualSource?.trace ? traceToText(issue.actualSource.trace).join('  |  ') : '–',
+      });
+    });
+  };
+
+  if (diagnosticResult.voucherAnalysis) {
+    Object.values(diagnosticResult.voucherAnalysis).forEach(sheet =>
+      sheet.vouchers.forEach(v => collect(v.issues, `Voucher: ${v.voucherId}`))
+    );
+  }
+  if (diagnosticResult.scenarioAnalysis) {
+    diagnosticResult.scenarioAnalysis.findings.forEach(f =>
+      collect(f.issues, `Scenario ${f.id}: ${f.description}`)
+    );
+  }
+
+  if (rows.length === 0) {
+    ws.addRow({ source: 'No issues found', module: '', transactionType: '', postingType: '', accountSource: '', configElement: '', mainAccount: '', issueType: '', severity: '', detail: '', trace: '' });
+    return;
+  }
+
+  rows.forEach(r => {
+    const row = ws.addRow(r);
+    if (r.severity === 'critical')    row.fill = fill('FFFEE2E2');
+    else if (r.severity === 'high')   row.fill = fill('FFFFF7ED');
+    else if (r.severity === 'medium') row.fill = fill('FFFEFCE8');
+    row.getCell('detail').alignment = { wrapText: true };
+    row.getCell('trace').alignment  = { wrapText: true };
+    row.height = 36;
+  });
+
+  ws.autoFilter = { from: 'A1', to: 'K1' };
 }
 
 module.exports = { exportToExcel, exportToWord };

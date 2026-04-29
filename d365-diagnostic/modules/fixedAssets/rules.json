@@ -1,0 +1,24 @@
+{
+  "_meta": { "module": "fixed_assets", "label": "Fixed Assets" },
+
+  "Acquisition": {
+    "label": "Fixed Asset Acquisition",
+    "debit":  ["FixedAssetPostingProfile", "AssetGroup", "LedgerMapping"],
+    "credit": ["FixedAssetPostingProfile", "VendorPostingProfile", "LedgerMapping"]
+  },
+  "Depreciation": {
+    "label": "Asset Depreciation",
+    "debit":  ["FrenchRegulatoryParameters", "FixedAssetPostingProfile", "DepreciationProfile", "AssetGroup", "LedgerMapping"],
+    "credit": ["FrenchRegulatoryParameters", "FixedAssetPostingProfile", "DepreciationProfile", "AssetGroup", "LedgerMapping"]
+  },
+  "Disposal": {
+    "label": "Asset Disposal",
+    "debit":  ["FixedAssetPostingProfile", "AssetGroup", "LedgerMapping"],
+    "credit": ["FixedAssetPostingProfile", "AssetGroup", "LedgerMapping"]
+  },
+  "Revaluation": {
+    "label": "Asset Revaluation",
+    "debit":  ["FixedAssetPostingProfile", "LedgerMapping"],
+    "credit": ["FixedAssetPostingProfile", "LedgerMapping"]
+  }
+}

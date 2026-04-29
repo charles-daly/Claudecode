@@ -1,0 +1,86 @@
+{
+  "CustomerPostingProfile": {
+    "applicableModules": ["sales", "pma"],
+    "description": "Accounts Receivable customer posting profile defines the AR summary account debited on customer invoice posting. If trade receivables (411) are posting to the wrong account, this is the primary source to investigate.",
+    "d365Path": "Accounts Receivable > Setup > Customer Posting Profiles",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Summary Account (Trade Receivables)": {
+        "description": "Primary AR control account debited on all customer invoices",
+        "accountPrefixes": { "FR": ["41"], "US": ["110"] },
+        "canonicalPrefixes": { "FR": ["411","4111"], "US": ["110000"] }
+      },
+      "Accrued Revenue Account": {
+        "description": "Unbilled / accrued revenue account for revenue earned but not yet invoiced",
+        "accountPrefixes": { "FR": ["418"], "US": ["120"] },
+        "canonicalPrefixes": { "FR": ["418"], "US": ["120000"] }
+      }
+    }
+  },
+
+  "ItemGroupPosting": {
+    "applicableModules": ["sales", "procurement", "inventory"],
+    "description": "Item group posting setup defines revenue and COGS accounts for sales transactions. On a customer invoice, ItemGroupPosting determines both the revenue credit account and the COGS debit account. It is the primary source when sales revenue or COGS is posting to unexpected accounts.",
+    "d365Path": "Inventory Management > Setup > Posting > Posting",
+    "priority": 1,
+    "confidence": "High",
+    "fields": {
+      "Revenue Account": {
+        "description": "Revenue account credited on customer invoices (products / goods sold)",
+        "accountPrefixes": { "FR": ["70","71"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["701","707","708"], "US": ["400200","400300"] }
+      },
+      "Service Revenue Account": {
+        "description": "Revenue account for service lines on sales orders",
+        "accountPrefixes": { "FR": ["706","708"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["706"], "US": ["400100"] }
+      },
+      "Cost of Goods Sold Account": {
+        "description": "COGS account debited on sales shipment / inventory issue",
+        "accountPrefixes": { "FR": ["607","603","6037"], "US": ["500"] },
+        "canonicalPrefixes": { "FR": ["607","6037"], "US": ["500100"] }
+      },
+      "Inventory Issue Account": {
+        "description": "Inventory balance sheet account credited on goods issue",
+        "accountPrefixes": { "FR": ["31","35","37"], "US": ["140"] },
+        "canonicalPrefixes": { "FR": ["311","355","371"], "US": ["140000"] }
+      }
+    }
+  },
+
+  "RevenueRecognition": {
+    "applicableModules": ["sales", "pma"],
+    "description": "Revenue Recognition module setup controls deferral and release of revenue when recognition criteria are not met at invoice date. Investigate this source when revenue is being deferred or released to unexpected accounts.",
+    "d365Path": "Revenue Recognition > Setup > Revenue Recognition Schedules",
+    "priority": 2,
+    "confidence": "High",
+    "fields": {
+      "Deferred Revenue Account": {
+        "description": "Balance sheet liability account for revenue deferred pending recognition",
+        "accountPrefixes": { "FR": ["487","48"], "US": ["230","125"] },
+        "canonicalPrefixes": { "FR": ["487"], "US": ["230000"] }
+      },
+      "Recognised Revenue Account": {
+        "description": "P&L revenue account to which deferred revenue is released on recognition",
+        "accountPrefixes": { "FR": ["70","71"], "US": ["400"] },
+        "canonicalPrefixes": { "FR": ["701","706","707"], "US": ["400100","400200"] }
+      }
+    }
+  },
+
+  "LedgerMapping": {
+    "applicableModules": ["sales"],
+    "description": "Chart of accounts main account — the fallback source. When no sales-specific posting profile matches, the entry likely originated from a manual GL journal bypassing module logic.",
+    "d365Path": "General Ledger > Chart of Accounts > Accounts > Main Accounts",
+    "priority": 99,
+    "confidence": "Low",
+    "fields": {
+      "Main Account (Direct GL)": {
+        "description": "Direct chart of accounts reference — no module posting profile source detected",
+        "accountPrefixes": { "*": [""] },
+        "canonicalPrefixes": { "*": [] }
+      }
+    }
+  }
+}

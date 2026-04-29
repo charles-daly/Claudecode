@@ -1,0 +1,71 @@
+{
+  "Acquisition": {
+    "label": "Fixed Asset Acquisition",
+    "description": "Asset cost recorded on the balance sheet — fixed asset account debited, FA supplier payable (404) credited. Must use 404, not general trade payables (401).",
+    "detection": {
+      "debitPrefixes":  ["21","2154","2157","2182","2051","2152"],
+      "creditPrefixes": ["40","401","404"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["2154","2157","2182","2051","2152","215","21"], "label": "Fixed Asset — Cost" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["404"], "label": "Supplier of Fixed Assets" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["150100","150200"], "label": "Fixed Asset — Cost" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["200100"], "label": "AP — Fixed Assets" }
+    ],
+    "knownErrors": {
+      "401": { "shouldBe": ["404"], "detail": "General trade payable (401) used instead of FA supplier account (404). Update Fixed Asset Posting Profile > Acquisition Offset Account." }
+    }
+  },
+
+  "Depreciation": {
+    "label": "Asset Depreciation",
+    "description": "Periodic depreciation charge — depreciation expense debited, accumulated depreciation credited. Under French GAAP with PMA enabled, an additional provision entry (68725 / 1510) is required.",
+    "detection": {
+      "debitPrefixes":  ["6811","6812","68725"],
+      "creditPrefixes": ["28","281","2818","28154","28182","2851","1510"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["6811","6812"], "label": "Depreciation Expense" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["28154","28182","2818","2851"], "label": "Accumulated Depreciation" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["510000"], "label": "Depreciation Expense" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["159000"], "label": "Accumulated Depreciation" }
+    ],
+    "pmaEntries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["68725","6872"], "label": "PMA Provision Charge" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["1510","15"],    "label": "PMA Reserve" }
+    ],
+    "knownErrors": {
+      "6811": { "shouldBe": ["6812"], "detail": "Tangible asset depreciation account (6811) used for an intangible — check posting profile asset type classification." }
+    }
+  },
+
+  "Disposal": {
+    "label": "Asset Disposal",
+    "description": "Asset retirement — accumulated depreciation reversed (debited), asset cost removed (credited), net gain/loss posted to 775/675.",
+    "detection": {
+      "debitPrefixes":  ["28","281","2818","28154","28182","2851"],
+      "creditPrefixes": ["21","2154","2157","2182","2051"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["28154","28182","2851","28"], "label": "Accumulated Depreciation (reversal)" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["2154","2157","2182","2051"], "label": "Fixed Asset Cost (removal)" },
+      { "gaap": "us_gaap",     "side": "debit",  "accounts": ["159000"], "label": "Accumulated Depreciation (reversal)" },
+      { "gaap": "us_gaap",     "side": "credit", "accounts": ["150100","150200"], "label": "Fixed Asset Cost (removal)" }
+    ],
+    "knownErrors": {}
+  },
+
+  "Revaluation": {
+    "label": "Asset Revaluation",
+    "description": "Upward or downward revaluation of an asset's carrying value.",
+    "detection": {
+      "debitPrefixes":  ["21","2154","2157"],
+      "creditPrefixes": ["10","106","107"]
+    },
+    "entries": [
+      { "gaap": "french_gaap", "side": "debit",  "accounts": ["2154","2157","2182"], "label": "Fixed Asset (revalued cost)" },
+      { "gaap": "french_gaap", "side": "credit", "accounts": ["1062","107"], "label": "Revaluation Reserve" }
+    ],
+    "knownErrors": {}
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "Expense": {
+    "label": "Project Expense",
+    "description": "Cost charged to a project — labour, materials, travel, subcontractor fees, or overhead allocation.",
+    "detection": {
+      "debitPrefixes":  ["60","61","62","63","64","65","641","645"],
+      "creditPrefixes": ["40","42","51","16"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["60","61","62","63","64","65"], "label": "Project Expense / Cost Account" },
+      { "gaap": "all", "side": "credit", "accounts": ["401","403","421","422","512","16"], "label": "Vendor Payable / Payroll / Bank / Accrual" }
+    ],
+    "knownErrors": {
+      "641": { "shouldBe": ["601","621"], "detail": "Salary account (641) posted directly to project — should route via Payroll Posting Profile allocation, not direct charge." },
+      "512": { "shouldBe": ["401","421"], "detail": "Bank account used as credit offset for an expense — verify this is not a duplicate of an already-posted AP or payroll entry." }
+    }
+  },
+
+  "Revenue": {
+    "label": "Project Revenue",
+    "description": "Revenue recognition or direct billing on a project — milestone invoicing, percentage-of-completion entries, or deferred revenue release.",
+    "detection": {
+      "debitPrefixes":  ["411","418","487"],
+      "creditPrefixes": ["70","71","487"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["411","418","487"], "label": "Trade Receivables / Accrued Revenue / Deferred Revenue Release" },
+      { "gaap": "all", "side": "credit", "accounts": ["701","706","707","708","487"], "label": "Revenue / Deferred Revenue" }
+    ],
+    "knownErrors": {
+      "419": { "shouldBe": ["411"], "detail": "Customer deposit / advance (419) used instead of trade receivables (411) — review billing workflow." },
+      "706": { "shouldBe": ["701"], "detail": "Services revenue account (706) used where product revenue (701) was expected — verify item category setup in project contract." }
+    }
+  },
+
+  "WIP": {
+    "label": "Work-In-Progress",
+    "description": "WIP cost accumulation or recognition — staging project costs on the balance sheet before revenue recognition criteria are met.",
+    "detection": {
+      "debitPrefixes":  ["33","34","35","418"],
+      "creditPrefixes": ["70","71","33","34","35","487"]
+    },
+    "entries": [
+      { "gaap": "all", "side": "debit",  "accounts": ["3411","3511","341","351","418","487"], "label": "WIP Asset / Accrued Revenue / Deferred Revenue Release" },
+      { "gaap": "all", "side": "credit", "accounts": ["701","706","71","3411","3511","487"],   "label": "Revenue / Change in Production / WIP Reduction" }
+    ],
+    "knownErrors": {
+      "35": { "shouldBe": ["34"], "detail": "Finished goods account (35x) used for WIP — check project category determines WIP vs. finished-goods classification." }
+    }
+  }
+}

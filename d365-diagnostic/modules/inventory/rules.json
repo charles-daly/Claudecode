@@ -1,0 +1,24 @@
+{
+  "_meta": { "module": "inventory", "label": "Inventory Management" },
+
+  "Issue": {
+    "label": "Inventory Issue / Consumption",
+    "debit":  ["InventoryPostingProfile", "LedgerMapping"],
+    "credit": ["InventoryPostingProfile", "ItemGroup", "LedgerMapping"]
+  },
+  "Receipt": {
+    "label": "Inventory Receipt",
+    "debit":  ["InventoryPostingProfile", "ItemGroup", "LedgerMapping"],
+    "credit": ["InventoryPostingProfile", "LedgerMapping"]
+  },
+  "Transfer": {
+    "label": "Inventory Transfer",
+    "debit":  ["InventoryPostingProfile", "LedgerMapping"],
+    "credit": ["InventoryPostingProfile", "LedgerMapping"]
+  },
+  "Adjustment": {
+    "label": "Inventory Adjustment",
+    "debit":  ["InventoryPostingProfile", "ItemGroup", "LedgerMapping"],
+    "credit": ["InventoryPostingProfile", "ItemGroup", "LedgerMapping"]
+  }
+}

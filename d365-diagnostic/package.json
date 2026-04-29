@@ -36,6 +36,7 @@
       "preload.js",
       "src/engine/**/*",
       "data/**/*",
+      "modules/**/*",
       "package.json",
       "node_modules/**/*"
     ],
@@ -43,6 +44,10 @@
       {
         "from": "data",
         "to": "data"
+      },
+      {
+        "from": "modules",
+        "to": "modules"
       }
     ],
     "win": {
