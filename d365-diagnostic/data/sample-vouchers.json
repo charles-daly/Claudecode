@@ -21,5 +21,97 @@
     ],
     "vouchers": {},
     "stats": { "totalEntries": 17, "uniqueVouchers": 8 }
+  },
+  "Dual GAAP Entries": {
+    "entries": [
+      {
+        "voucher": "DG-2024-001", "date": "2024-03-01",
+        "transactionType": "Invoice", "module": "Sales",
+        "usAccount": "110000", "frAccount": "411", "account": "110000",
+        "description": "Trade Receivable – Customer A  [CORRECT MAPPING]",
+        "debit": 30000, "credit": 0, "currency": "USD", "exchangeRate": 0.92
+      },
+      {
+        "voucher": "DG-2024-001", "date": "2024-03-01",
+        "transactionType": "Invoice", "module": "Sales",
+        "usAccount": "400200", "frAccount": "701", "account": "400200",
+        "description": "Product Sales Revenue  [CORRECT MAPPING]",
+        "debit": 0, "credit": 30000, "currency": "USD", "exchangeRate": 0.92
+      },
+      {
+        "voucher": "DG-2024-002", "date": "2024-03-15",
+        "transactionType": "COGS", "module": "Sales",
+        "usAccount": "500100", "frAccount": "401", "account": "500100",
+        "description": "Cost of Goods Sold  [WRONG FR: 401 used, expected 607]",
+        "debit": 18000, "credit": 0, "currency": "USD", "exchangeRate": 0.92
+      },
+      {
+        "voucher": "DG-2024-002", "date": "2024-03-15",
+        "transactionType": "COGS", "module": "Sales",
+        "usAccount": "110000", "frAccount": "411", "account": "110000",
+        "description": "Trade Receivable – COGS clearing  [CORRECT MAPPING]",
+        "debit": 0, "credit": 18000, "currency": "USD", "exchangeRate": 0.92
+      },
+      {
+        "voucher": "DG-2024-003", "date": "2024-03-20",
+        "transactionType": "Invoice", "module": "Procurement",
+        "usAccount": "200000", "frAccount": "401", "account": "200000",
+        "description": "Trade Payable – Supplier X  [CONFLICT: US 200000 maps to 401 here…]",
+        "debit": 0, "credit": 45000, "currency": "EUR", "exchangeRate": 1
+      },
+      {
+        "voucher": "DG-2024-003", "date": "2024-03-20",
+        "transactionType": "Invoice", "module": "Procurement",
+        "usAccount": "200000", "frAccount": "408", "account": "200000",
+        "description": "Accrued Invoice – Supplier X  [CONFLICT: …and to 408 here — inconsistent]",
+        "debit": 45000, "credit": 0, "currency": "EUR", "exchangeRate": 1
+      },
+      {
+        "voucher": "DG-2024-004", "date": "2024-03-25",
+        "transactionType": "Manual", "module": "GeneralLedger",
+        "usAccount": "999000", "frAccount": "699", "account": "999000",
+        "description": "Custom Clearing Account  [MISSING MAPPING: 999000 not in mapping table]",
+        "debit": 5000, "credit": 0, "currency": "EUR", "exchangeRate": 1
+      },
+      {
+        "voucher": "DG-2024-004", "date": "2024-03-25",
+        "transactionType": "Manual", "module": "GeneralLedger",
+        "usAccount": "110000", "frAccount": "411", "account": "110000",
+        "description": "Trade Receivable – offset  [CORRECT MAPPING]",
+        "debit": 0, "credit": 5000, "currency": "EUR", "exchangeRate": 1
+      },
+      {
+        "voucher": "DG-2024-005", "date": "2024-03-31",
+        "transactionType": "Expense", "module": "PMA",
+        "usAccount": "52000", "frAccount": "641", "account": "52000",
+        "description": "Salaries & Wages – March  [CORRECT MAPPING]",
+        "debit": 75000, "credit": 0, "currency": "EUR", "exchangeRate": 1,
+        "project": "PROJ-001", "category": "Labor"
+      },
+      {
+        "voucher": "DG-2024-005", "date": "2024-03-31",
+        "transactionType": "Expense", "module": "PMA",
+        "usAccount": "215000", "frAccount": "421", "account": "215000",
+        "description": "Personnel Payable – March  [CORRECT MAPPING]",
+        "debit": 0, "credit": 75000, "currency": "EUR", "exchangeRate": 1,
+        "project": "PROJ-001", "category": "Labor"
+      },
+      {
+        "voucher": "DG-2024-006", "date": "2024-03-31",
+        "transactionType": "Depreciation", "module": "FixedAssets",
+        "usAccount": "510000", "frAccount": "2818", "account": "510000",
+        "description": "Depreciation Expense  [WRONG: FR 2818 is BS (Accumulated Depr.), should be 6811 P&L]",
+        "debit": 2500, "credit": 0, "currency": "EUR", "exchangeRate": 1
+      },
+      {
+        "voucher": "DG-2024-006", "date": "2024-03-31",
+        "transactionType": "Depreciation", "module": "FixedAssets",
+        "usAccount": "159000", "frAccount": "2818", "account": "159000",
+        "description": "Accumulated Depreciation  [CORRECT MAPPING]",
+        "debit": 0, "credit": 2500, "currency": "EUR", "exchangeRate": 1
+      }
+    ],
+    "vouchers": {},
+    "stats": { "totalEntries": 12, "uniqueVouchers": 6 }
   }
 }

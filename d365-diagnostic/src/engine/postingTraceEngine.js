@@ -11,37 +11,19 @@
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Formats a numeric amount with thousands separators and 2 decimal places.
- * @param {number|string} value
- * @returns {string}
- */
 function _formatAmount(value) {
   const num = parseFloat(value);
   if (isNaN(num)) return '0.00';
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-/**
- * Left-pads a label string so that all labels align to a fixed column width.
- * @param {string} label
- * @param {number} width
- * @returns {string}
- */
 function _padLabel(label, width) {
   return label.padEnd(width, ' ');
 }
 
-// Column width for all labels (longest is "Transaction Type" = 16 chars + " → " = 19)
-const LABEL_WIDTH = 16;
-const ARROW       = ' → '; // ' → '
+const LABEL_WIDTH = 18;
+const ARROW       = ' → ';
 
-/**
- * Builds one line of the trace text.
- * @param {string} label
- * @param {string} value
- * @returns {string}
- */
 function _line(label, value) {
   return `${_padLabel(label, LABEL_WIDTH)}${ARROW}${value}`;
 }
@@ -54,12 +36,11 @@ function _line(label, value) {
  * Builds a posting trace object for a single voucher entry.
  *
  * @param {Object} opts
- * @param {Object} opts.entry               Voucher line: { account, description, debit, credit, ... }
- * @param {Object} opts.scenario            Scenario descriptor: { description, transactionType, ... }
- * @param {Object} opts.context             Context: { module, gaap, ... }
- * @param {Object|null} opts.sourceResolution  Result from accountSourceResolver:
- *                                          { source, field, d365Path, confidence } or null
- * @param {Object|null} opts.mappingAnalysis   Result from gaapMappingEngine.analyseAccountMapping() or null
+ * @param {Object} opts.entry               Voucher line: { usAccount, frAccount, account, description, debit, credit, … }
+ * @param {Object} opts.scenario            Scenario descriptor: { description, transactionType, … }
+ * @param {Object} opts.context             Context: { module, gaap, … }
+ * @param {Object|null} opts.sourceResolution  Result from accountSourceResolver
+ * @param {Object|null} opts.mappingAnalysis   Result from gaapMappingEngine.analyseAccountMapping()
  * @returns {Object}
  */
 function buildPostingTrace(opts) {
@@ -72,11 +53,14 @@ function buildPostingTrace(opts) {
   } = opts || {};
 
   // ── Basic fields ──────────────────────────────────────────────────────────
-  const businessEvent   = scenario.description   || '';
-  const module          = context.module         || '';
+  const businessEvent   = scenario.description    || '';
+  const module          = context.module          || '';
   const transactionType = scenario.transactionType || '';
-  const account         = entry.account          || '';
-  const description     = entry.description      || '';
+
+  // Account resolution: prefer explicit usAccount, fall back to account
+  const usAccount   = entry.usAccount || entry.account || '';
+  const frAccount   = entry.frAccount || '';
+  const description = entry.description || '';
 
   // Determine posting type and amount
   const debitVal  = parseFloat(entry.debit)  || 0;
@@ -105,29 +89,25 @@ function buildPostingTrace(opts) {
       }
     : null;
 
-  // ── GAAP mapping ──────────────────────────────────────────────────────────
+  // ── GAAP mapping (legacy analyseAccountMapping path) ─────────────────────
   const gaapMapping = (mappingAnalysis && mappingAnalysis.mappingFound)
     ? mappingAnalysis
     : null;
 
+  // ── Dual-GAAP inline analysis (from gaapAnalysis on the entry itself) ────
+  const gaapAnalysis = entry.gaapAnalysis || null;
+
   // ── Trace text ────────────────────────────────────────────────────────────
   const lines = [];
 
-  // Business Event
-  lines.push(_line('Business Event', businessEvent));
-
-  // Module
-  lines.push(_line('Module', module ? module.toUpperCase() : ''));
-
-  // Transaction Type
+  lines.push(_line('Business Event',   businessEvent));
+  lines.push(_line('Module',           module ? module.toUpperCase() : ''));
   lines.push(_line('Transaction Type', transactionType));
 
-  // Posting Type — DR/CR + formatted amount
   const drCr         = postingType === 'debit' ? 'DR' : 'CR';
   const formattedAmt = _formatAmount(amount);
   lines.push(_line('Posting Type', `${drCr} ${formattedAmt}`));
 
-  // Account Source
   if (accountSource) {
     const srcLine = `${accountSource.source} → "${accountSource.field}"  (${accountSource.confidence} confidence)`;
     lines.push(_line('Account Source', srcLine));
@@ -135,26 +115,73 @@ function buildPostingTrace(opts) {
     lines.push(_line('Account Source', 'Not resolved'));
   }
 
-  // Selected Account
-  const selectedLine = description
-    ? `${account}  (${description})`
-    : account;
-  lines.push(_line('Selected Account', selectedLine));
+  // US account line
+  lines.push(_line('US Account', usAccount || '—'));
 
-  // GAAP Mapping lines
-  if (gaapMapping) {
+  // ── Dual-GAAP trace: US → Mapping → FR ───────────────────────────────────
+  if (gaapAnalysis) {
+    const status = gaapAnalysis.mappingStatus || 'unknown';
+
+    if (status === 'correct') {
+      lines.push(_line(
+        'GAAP Trace',
+        `${gaapAnalysis.usAccount} (US) → [${gaapAnalysis.mappedType || 'mapped'}] → ${gaapAnalysis.frAccount} (FR)  ✓ Correct`
+      ));
+      if (gaapAnalysis.mappedDescription) {
+        lines.push(_line('Mapping Desc.', gaapAnalysis.mappedDescription));
+      }
+    } else if (status === 'incorrect') {
+      lines.push(_line(
+        'GAAP Trace',
+        `${gaapAnalysis.usAccount} (US) → [${gaapAnalysis.mappedType || 'mapped'}] → ${gaapAnalysis.frAccount} (FR)  ✗ Incorrect (expected: ${gaapAnalysis.expectedFrAccount})`
+      ));
+      if (gaapAnalysis.classificationMismatch) {
+        lines.push(_line(
+          'Classification',
+          `${gaapAnalysis.frClassification} used — ${gaapAnalysis.expFrClassification} expected`
+        ));
+      }
+    } else if (status === 'missing') {
+      lines.push(_line(
+        'GAAP Trace',
+        `${gaapAnalysis.usAccount} (US) → [no mapping] → ${gaapAnalysis.frAccount || '?'} (FR)  ⚠ No mapping defined`
+      ));
+    } else if (status === 'missing_fr') {
+      lines.push(_line('GAAP Trace', `${gaapAnalysis.usAccount} (US) → [?] → (FR missing)  ⚠`));
+    } else if (status === 'missing_us') {
+      lines.push(_line('GAAP Trace', `(US missing) → [?] → ${gaapAnalysis.frAccount || '?'} (FR)  ⚠`));
+    }
+
+    if (gaapAnalysis.rootCause) {
+      lines.push(_line('Root Cause', gaapAnalysis.rootCause.replace(/_/g, ' ')));
+    }
+    if (gaapAnalysis.fix) {
+      lines.push(_line('Recommended Fix', gaapAnalysis.fix));
+    }
+  } else if (frAccount) {
+    lines.push(_line('GAAP Trace', `${usAccount} (US) → ${frAccount} (FR)`));
+  } else if (gaapMapping) {
     const mappingLine =
       `${gaapMapping.usAccount} (US) ↔ ${gaapMapping.frAccount} (FR)  ${gaapMapping.description || ''}`.trim();
     lines.push(_line('GAAP Mapping', mappingLine));
-
-    const statusLabel = (gaapMapping.mappingStatus || 'unknown').toUpperCase();
-    lines.push(_line('Mapping Status', statusLabel));
+    lines.push(_line('Mapping Status', (gaapMapping.mappingStatus || 'unknown').toUpperCase()));
   } else {
-    // No mapping found — show informational line
-    const noMapMsg = account
-      ? `No mapping found for account ${account}`
-      : 'No mapping found';
-    lines.push(_line('GAAP Mapping', noMapMsg));
+    lines.push(_line('GAAP Trace', usAccount ? `No GAAP mapping for account ${usAccount}` : 'No GAAP mapping'));
+  }
+
+  // Selected account
+  const selectedLine = description ? `${usAccount}  (${description})` : usAccount;
+  lines.push(_line('Selected Account', selectedLine));
+  if (frAccount) {
+    lines.push(_line('FR Account', frAccount));
+  }
+
+  // Currency / exchange rate
+  if (entry.currency && entry.currency !== 'EUR') {
+    const rateStr = entry.exchangeRate && entry.exchangeRate !== 1
+      ? `  @ ${entry.exchangeRate}`
+      : '';
+    lines.push(_line('Currency', `${entry.currency}${rateStr}`));
   }
 
   const traceText = lines.join('\n');
@@ -165,19 +192,18 @@ function buildPostingTrace(opts) {
     module,
     transactionType,
     postingType,
-    account,
+    usAccount,
+    frAccount,
+    account: usAccount,
     description,
     amount,
+    currency:     entry.currency     || 'EUR',
+    exchangeRate: entry.exchangeRate || 1,
     accountSource,
     gaapMapping,
+    gaapAnalysis,
     traceText,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Exports
-// ---------------------------------------------------------------------------
-
-module.exports = {
-  buildPostingTrace,
-};
+module.exports = { buildPostingTrace };

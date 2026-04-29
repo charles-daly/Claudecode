@@ -43,7 +43,15 @@ ipcMain.handle('dialog:openExcel', async () => {
 
   try {
     const { parseExcelFile } = require('./src/engine/excelParser');
+    const { validateDualGaap } = require('./src/engine/gaapValidationEngine');
     const data = parseExcelFile(result.filePaths[0]);
+
+    // Run dual-GAAP validation on each sheet so the import preview
+    // can show mapping status immediately without a separate diagnostic run.
+    Object.keys(data).forEach(sheetName => {
+      data[sheetName].gaapValidation = validateDualGaap(data[sheetName], {});
+    });
+
     return { success: true, data, filePath: result.filePaths[0] };
   } catch (err) {
     return { success: false, error: err.message };
@@ -105,8 +113,24 @@ ipcMain.handle('data:loadSample', async () => {
     const samplePath = isDev
       ? path.join(__dirname, 'data', 'sample-vouchers.json')
       : path.join(process.resourcesPath, 'data', 'sample-vouchers.json');
-    const raw = fs.readFileSync(samplePath, 'utf-8');
-    return { success: true, data: JSON.parse(raw) };
+    const raw  = fs.readFileSync(samplePath, 'utf-8');
+    const json = JSON.parse(raw);
+
+    // Build computed voucher groups and gaapValidation for each sheet
+    const { groupByVoucher, calcStats } = require('./src/engine/excelParser');
+    const { validateDualGaap }          = require('./src/engine/gaapValidationEngine');
+
+    const data = {};
+    Object.entries(json).forEach(([sheetName, sheetRaw]) => {
+      const entries  = sheetRaw.entries || [];
+      const vouchers = groupByVoucher(entries);
+      const stats    = calcStats(entries);
+      const sheet    = { entries, vouchers, stats };
+      sheet.gaapValidation = validateDualGaap(sheet, {});
+      data[sheetName] = sheet;
+    });
+
+    return { success: true, data };
   } catch (err) {
     return { success: false, error: err.message };
   }

@@ -5,6 +5,7 @@ const { analyseVoucher } = require('./voucherAnalyzer');
 const { resolveAccountSource, resolveAccountPair } = require('./accountSourceResolver');
 const { moduleLoader } = require('./moduleLoader');
 const { analyseAccrualScenario } = require('./accrualEngine');
+const { validateDualGaap } = require('./gaapValidationEngine');
 
 /**
  * Master diagnostic runner.
@@ -188,8 +189,74 @@ function analyseScenario(scenario, context, idx) {
 // ─── Voucher data analysis ────────────────────────────────────────────────────
 function analyseVoucherData(voucherData, context) {
   const sheetResults = {};
+
   Object.entries(voucherData).forEach(([sheetName, sheetData]) => {
-    const voucherResults = Object.values(sheetData.vouchers).map(v => analyseVoucher(v, context));
+    // Run dual-GAAP validation on every sheet (no-op for single-account sheets)
+    const gaapValidation = sheetData.gaapValidation || validateDualGaap(sheetData, context);
+
+    // Use the enriched vouchers from gaapValidation when available so that
+    // the voucherAnalyzer sees gaapAnalysis on each entry
+    const voucherMap = gaapValidation.isDualGaap
+      ? gaapValidation.vouchers
+      : sheetData.vouchers;
+
+    const voucherResults = Object.values(voucherMap).map(v => analyseVoucher(v, context));
+
+    // Promote GAAP-level issues as diagnostic issues on each voucher result
+    if (gaapValidation.isDualGaap) {
+      gaapValidation.reconciliations.forEach(recon => {
+        const vResult = voucherResults.find(v => v.voucherId === recon.voucherId);
+        if (!vResult) return;
+        recon.issues.forEach(ri => {
+          vResult.issues.push({
+            type:     ri.type,
+            severity: ri.severity,
+            code:     ri.type === 'CLASSIFICATION_MISMATCH' ? ROOT_CAUSES.GAAP_MAPPING_MISMATCH?.code : ROOT_CAUSES.GAAP_MAPPING_MISSING?.code,
+            title:    ri.type === 'CLASSIFICATION_MISMATCH' ? 'GAAP Classification Mismatch'
+                    : ri.type === 'INCORRECT_FR_ACCOUNT'    ? 'Incorrect French Account'
+                    : ri.type === 'MISSING_MAPPING'         ? 'Missing GAAP Mapping'
+                    : ri.type,
+            detail:   ri.issue || '',
+            fix:      ri.fix   || '',
+            gaapRootCause: ri.rootCause,
+            usAccount: ri.usAccount,
+            frAccount: ri.frAccount,
+            expectedFrAccount: ri.expectedFrAccount,
+            actualSource:     null,
+            expectedSource:   null,
+            sourceComparison: null,
+            universalModel:   uam(context, vResult.detectedType, null, null, null, ri.usAccount),
+          });
+        });
+        // Promote consistency issues that touch this voucher
+        gaapValidation.consistencyIssues
+          .filter(ci => ci.affectedVouchers?.includes(recon.voucherId) || ci.voucherId === recon.voucherId)
+          .forEach(ci => {
+            const already = vResult.issues.some(i => i.type === ci.type && i.usAccount === ci.usAccount);
+            if (!already) {
+              vResult.issues.push({
+                type:     ci.type,
+                severity: ci.severity,
+                title:    ci.type === 'CONFLICTING_MAPPING' ? 'Conflicting US↔FR Mapping' : 'Inconsistent Voucher Mapping',
+                detail:   ci.issue || '',
+                fix:      ci.fix   || '',
+                usAccount: ci.usAccount,
+                frAccounts: ci.frAccounts,
+                actualSource:     null,
+                expectedSource:   null,
+                sourceComparison: null,
+                universalModel:   uam(context, null, null, null, null, ci.usAccount),
+              });
+            }
+          });
+
+        // Update voucher severity / status to reflect GAAP issues
+        if (vResult.issues.some(i => i.severity === 'critical')) vResult.severity = 'critical';
+        else if (vResult.issues.some(i => i.severity === 'high') && vResult.severity !== 'critical') vResult.severity = 'high';
+        if (vResult.issues.length > 0) vResult.status = 'issues';
+      });
+    }
+
     sheetResults[sheetName] = {
       totalVouchers:    voucherResults.length,
       cleanVouchers:    voucherResults.filter(v => v.status === 'clean').length,
@@ -198,8 +265,10 @@ function analyseVoucherData(voucherData, context) {
       vouchers:         voucherResults,
       issueCategories:  categoriseIssues(voucherResults),
       stats:            sheetData.stats,
+      gaapValidation,
     };
   });
+
   return sheetResults;
 }
 
@@ -295,6 +364,7 @@ function buildSummary(results) {
   const summary = {
     totalIssues: 0, criticalCount: 0, errorCount: 0, warningCount: 0,
     issuesByType: {}, overallStatus: 'clean', sourceBreakdown: {}, moduleBreakdown: {},
+    dualGaap: null,
   };
 
   const collect = (issues, modName) => {
@@ -334,6 +404,29 @@ function buildSummary(results) {
   summary.topSources = Object.entries(summary.sourceBreakdown)
     .sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([source, count]) => ({ source, count }));
+
+  // ── Aggregate dual-GAAP summary across all sheets ─────────────────────────
+  if (results.voucherAnalysis) {
+    const dg = { isDualGaap: false, totalEntries: 0, correct: 0, incorrect: 0, missing: 0, conflicting: 0, consistencyErrors: 0 };
+    Object.values(results.voucherAnalysis).forEach(sheet => {
+      const gv = sheet.gaapValidation;
+      if (!gv?.isDualGaap) return;
+      dg.isDualGaap       = true;
+      dg.totalEntries     += gv.gaapSummary.totalEntries;
+      dg.correct          += gv.gaapSummary.correct;
+      dg.incorrect        += gv.gaapSummary.incorrect;
+      dg.missing          += gv.gaapSummary.missing;
+      dg.conflicting      += gv.gaapSummary.conflicting;
+      dg.consistencyErrors+= gv.gaapSummary.consistencyErrors;
+    });
+    if (dg.isDualGaap) {
+      dg.coveragePct  = dg.totalEntries > 0 ? Math.round((dg.correct / dg.totalEntries) * 100) : 0;
+      dg.overallStatus =
+        dg.conflicting > 0 || dg.incorrect > 0 ? 'error'   :
+        dg.missing     > 0                      ? 'warning' : 'clean';
+      summary.dualGaap = dg;
+    }
+  }
 
   return summary;
 }

@@ -52,6 +52,7 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
   addAccountSourceSheet(wb, diagnosticResult);
   addUniversalModelSheet(wb, diagnosticResult);
   addAccrualSheet(wb, diagnosticResult, context);
+  addDualGaapSheet(wb, diagnosticResult);
 
   await wb.xlsx.writeFile(filePath);
 }
@@ -308,6 +309,9 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
           heading2('9.  ACCRUAL / AUTO-REVERSAL ANALYSIS'),
           ...accrualSection(diagnosticResult),
         ] : []),
+
+        heading2('10.  DUAL GAAP RECONCILIATION ANALYSIS'),
+        ...dualGaapWordSection(diagnosticResult),
 
         spacer(),
         para(
@@ -930,6 +934,213 @@ function accrualSection(diagnosticResult) {
       }
     }
     parts.push(spacer());
+  });
+
+  return parts;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// DUAL GAAP ANALYSIS — Excel sheet
+// ════════════════════════════════════════════════════════════════════════════════
+function addDualGaapSheet(wb, diagnosticResult) {
+  const ws = wb.addWorksheet('Dual GAAP Analysis');
+
+  ws.columns = [
+    { header: 'Voucher',              key: 'voucher',       width: 20 },
+    { header: 'Date',                 key: 'date',          width: 13 },
+    { header: 'Module',               key: 'module',        width: 18 },
+    { header: 'Transaction Type',     key: 'txType',        width: 20 },
+    { header: 'US Account',           key: 'usAccount',     width: 12 },
+    { header: 'FR Account (Actual)',  key: 'frAccount',     width: 16 },
+    { header: 'FR Account (Expected)',key: 'expectedFr',    width: 18 },
+    { header: 'Mapping Status',       key: 'mappingStatus', width: 16 },
+    { header: 'US Classification',    key: 'usClass',       width: 16 },
+    { header: 'FR Classification',    key: 'frClass',       width: 16 },
+    { header: 'Root Cause',           key: 'rootCause',     width: 20 },
+    { header: 'Issue',                key: 'issue',         width: 60 },
+    { header: 'Fix',                  key: 'fix',           width: 65 },
+  ];
+
+  ws.getRow(1).eachCell(cell => {
+    cell.fill = fill(C.navy);
+    cell.font = { bold: true, color: { argb: C.white } };
+    cell.alignment = { horizontal: 'center', wrapText: true };
+  });
+  ws.getRow(1).height = 28;
+
+  // Collect all entries with gaapAnalysis across all sheets
+  const rows = [];
+  if (diagnosticResult.voucherAnalysis) {
+    Object.values(diagnosticResult.voucherAnalysis).forEach(sheetData => {
+      const gv = sheetData.gaapValidation;
+      if (!gv?.isDualGaap) return;
+      gv.entries.forEach(entry => {
+        const ga = entry.gaapAnalysis;
+        if (!ga) return;
+        rows.push({
+          voucher:       entry.voucher       || '–',
+          date:          entry.date          || '–',
+          module:        entry.module        || '–',
+          txType:        entry.transactionType || '–',
+          usAccount:     ga.usAccount        || '–',
+          frAccount:     ga.frAccount        || '–',
+          expectedFr:    ga.expectedFrAccount || '–',
+          mappingStatus: ga.mappingStatus    || 'unknown',
+          usClass:       ga.usClassification || '–',
+          frClass:       ga.frClassification || '–',
+          rootCause:     ga.rootCause        || '–',
+          issue:         ga.issue            || '',
+          fix:           ga.fix              || '',
+        });
+      });
+
+      // Also append consistency issues as standalone rows
+      gv.consistencyIssues.forEach(ci => {
+        rows.push({
+          voucher:       ci.voucherId || ci.affectedVouchers?.join(', ') || '–',
+          date:          '–',
+          module:        '–',
+          txType:        '–',
+          usAccount:     ci.usAccount       || '–',
+          frAccount:     (ci.frAccounts || []).join(' / '),
+          expectedFr:    '–',
+          mappingStatus: ci.type === 'CONFLICTING_MAPPING' ? 'conflicting' : 'inconsistent',
+          usClass:       '–',
+          frClass:       '–',
+          rootCause:     'CONSISTENCY_ISSUE',
+          issue:         ci.issue || '',
+          fix:           ci.fix   || '',
+        });
+      });
+    });
+  }
+
+  if (rows.length === 0) {
+    ws.addRow({ voucher: 'No dual-GAAP data found. Import an Excel file with US_Account and FR_Account columns.', date: '', module: '', txType: '', usAccount: '', frAccount: '', expectedFr: '', mappingStatus: '', usClass: '', frClass: '', rootCause: '', issue: '', fix: '' });
+    return;
+  }
+
+  const statusStyle = {
+    correct:     { fill: 'FF052E16', font: 'FF86EFAC' },
+    incorrect:   { fill: 'FF450A0A', font: 'FFFCA5A5' },
+    missing:     { fill: 'FF422006', font: 'FFFCD34D' },
+    missing_us:  { fill: 'FF422006', font: 'FFFCD34D' },
+    missing_fr:  { fill: 'FF422006', font: 'FFFCD34D' },
+    conflicting: { fill: 'FF431407', font: 'FFFB923C' },
+    inconsistent:{ fill: 'FF431407', font: 'FFFB923C' },
+  };
+
+  rows.forEach(r => {
+    const row = ws.addRow(r);
+    row.getCell('issue').alignment = { wrapText: true };
+    row.getCell('fix').alignment   = { wrapText: true };
+    row.height = 40;
+
+    const st = statusStyle[r.mappingStatus];
+    if (st) {
+      const cell = row.getCell('mappingStatus');
+      cell.fill = fill(st.fill);
+      cell.font = { color: { argb: st.font }, bold: true };
+    }
+
+    if (r.mappingStatus === 'correct') {
+      row.getCell('usAccount').font = { color: { argb: 'FF60A5FA' }, bold: true };
+      row.getCell('frAccount').font = { color: { argb: 'FF34D399' }, bold: true };
+    } else if (r.mappingStatus === 'incorrect' || r.mappingStatus === 'conflicting' || r.mappingStatus === 'inconsistent') {
+      row.getCell('frAccount').font    = { color: { argb: 'FFFCA5A5' }, bold: true };
+      row.getCell('expectedFr').font   = { color: { argb: 'FF86EFAC' }, bold: true };
+    }
+  });
+
+  ws.autoFilter = { from: 'A1', to: 'M1' };
+}
+
+// ─── Dual GAAP Reconciliation — Word section ──────────────────────────────────
+function dualGaapWordSection(diagnosticResult) {
+  const parts = [];
+
+  // Collect gaapValidation data
+  const sheetValidations = [];
+  if (diagnosticResult.voucherAnalysis) {
+    Object.entries(diagnosticResult.voucherAnalysis).forEach(([name, data]) => {
+      const gv = data.gaapValidation;
+      if (gv?.isDualGaap) sheetValidations.push({ name, gv });
+    });
+  }
+
+  if (sheetValidations.length === 0) {
+    return [para(
+      'No dual-GAAP data detected. Import an Excel file that contains both US_Account and FR_Account columns to enable this analysis.',
+      { color: '888888' }
+    )];
+  }
+
+  parts.push(para(
+    'The Dual GAAP Reconciliation Engine validates the US GAAP ↔ French PCG (Plan Comptable Général) account correspondence in each imported journal entry. Each line is checked against the GAAP Mapping table. Mismatches, missing mappings, and cross-file consistency conflicts are all reported here.',
+    { color: '333333', after: 200 }
+  ));
+
+  sheetValidations.forEach(({ name, gv }) => {
+    const s = gv.gaapSummary;
+    const statusColor = s.overallStatus === 'error' ? 'C0392B' :
+                        s.overallStatus === 'warning' ? 'F39C12' : '27AE60';
+
+    parts.push(para2(`Sheet: ${name}  —  GAAP Status: `, s.overallStatus.toUpperCase(), statusColor));
+
+    // Summary table
+    parts.push(new Table({
+      width: { size: 60, type: WidthType.PERCENTAGE },
+      rows: [
+        tRow(['Metric', 'Value'], false, true),
+        tRow(['Total Entries',          String(s.totalEntries)],      true),
+        tRow(['Correct Mappings',       String(s.correct)],           false),
+        tRow(['Incorrect Mappings',     String(s.incorrect)],         true),
+        tRow(['Missing Mappings',       String(s.missing)],           false),
+        tRow(['Conflicting Mappings',   String(s.conflicting)],       true),
+        tRow(['Consistency Errors',     String(s.consistencyErrors)], false),
+        tRow(['Mapping Coverage',       `${s.coveragePct}%`],         true),
+      ],
+    }));
+    parts.push(spacer());
+
+    // Per-voucher reconciliation detail (up to 20 vouchers with issues)
+    const problemVouchers = gv.reconciliations.filter(r => r.issues.length > 0).slice(0, 20);
+    if (problemVouchers.length === 0) {
+      parts.push(para('✓ All vouchers in this sheet have correct GAAP mappings.', { color: '27AE60', after: 160 }));
+    } else {
+      parts.push(para(`${problemVouchers.length} voucher(s) with mapping issues:`, { after: 80 }));
+      problemVouchers.forEach(recon => {
+        parts.push(para(
+          `Voucher: ${recon.voucherId}  |  Entries: ${recon.totalEntries}  |  Coverage: ${recon.mappingCoverage}%  |  Status: ${recon.status.toUpperCase()}`,
+          { after: 50 }
+        ));
+        recon.issues.forEach(ri => {
+          parts.push(bullet(
+            `[${ri.severity?.toUpperCase()}] ${ri.type.replace(/_/g,' ')}` +
+            (ri.usAccount ? `  |  US: ${ri.usAccount}` : '') +
+            (ri.frAccount ? `  |  FR: ${ri.frAccount}` : '') +
+            (ri.expectedFrAccount ? `  |  Expected: ${ri.expectedFrAccount}` : '')
+          ));
+          if (ri.issue) parts.push(bullet(`   Issue: ${ri.issue}`));
+          if (ri.fix)   parts.push(bullet(`   Fix: ${ri.fix}`));
+        });
+        parts.push(spacer());
+      });
+    }
+
+    // Consistency issues
+    if (gv.consistencyIssues.length > 0) {
+      parts.push(para('Consistency Issues:', { after: 60 }));
+      gv.consistencyIssues.forEach(ci => {
+        parts.push(para(
+          `${ci.type === 'CONFLICTING_MAPPING' ? 'Global Conflict' : 'Voucher Conflict'}  |  US Account: ${ci.usAccount}`,
+          { after: 40 }
+        ));
+        parts.push(para(`FR Accounts Used: ${(ci.frAccounts || []).join(', ')}`, { color: '444444', after: 30 }));
+        parts.push(para(`Issue: ${ci.issue}`, { color: '444444', after: 30 }));
+        parts.push(para(`Fix: ${ci.fix}`, { italics: true, color: '2563EB', after: 80 }));
+      });
+    }
   });
 
   return parts;
