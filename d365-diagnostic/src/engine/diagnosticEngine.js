@@ -2,6 +2,7 @@
 
 const { ROOT_CAUSES, COMMON_ACCOUNT_ERRORS, getAccountName } = require('./accountingRules');
 const { analyseVoucher } = require('./voucherAnalyzer');
+const { resolveAccountSource, resolveAccountPair } = require('./accountSourceResolver');
 
 /**
  * Master diagnostic runner.
@@ -47,23 +48,26 @@ function analyseScenario(scenario, context, idx) {
     actualEntries   = [],
   } = scenario;
 
-  const issues = [];
+  const issues      = [];
   const countryCode = context.country === 'FR' ? 'FR' : 'US';
 
-  // Balance check on actual entries
+  // ── Balance check ──────────────────────────────────────────────────────────
   const totalDR = actualEntries.reduce((s, e) => s + (e.debit  || 0), 0);
   const totalCR = actualEntries.reduce((s, e) => s + (e.credit || 0), 0);
 
   if (actualEntries.length > 0 && Math.abs(totalDR - totalCR) > 0.01) {
     issues.push({
-      type: 'UNBALANCED_VOUCHER',
+      type:     'UNBALANCED_VOUCHER',
       severity: 'critical',
       ...ROOT_CAUSES.UNBALANCED_VOUCHER,
-      detail: `Imbalance: ${Math.abs(totalDR - totalCR).toFixed(2)}`,
+      detail:           `Imbalance: ${Math.abs(totalDR - totalCR).toFixed(2)}`,
+      actualSource:     null,
+      expectedSource:   null,
+      sourceComparison: null,
     });
   }
 
-  // Compare expected vs actual
+  // ── Expected vs actual comparison ─────────────────────────────────────────
   expectedEntries.forEach(exp => {
     const exactMatch = actualEntries.find(a =>
       a.account === exp.account &&
@@ -71,9 +75,9 @@ function analyseScenario(scenario, context, idx) {
       Math.abs((a.credit || 0) - (exp.credit || 0)) < 0.01
     );
 
-    if (exactMatch) return; // OK
+    if (exactMatch) return;
 
-    // Same amount, wrong account?
+    // Same amount, different account?
     const wrongAccountMatch = actualEntries.find(a =>
       a.account !== exp.account &&
       Math.abs((a.debit  || 0) - (exp.debit  || 0)) < 0.01 &&
@@ -81,64 +85,114 @@ function analyseScenario(scenario, context, idx) {
     );
 
     if (wrongAccountMatch) {
+      const side = (exp.debit || 0) > 0 ? 'debit' : 'credit';
+      const pair = resolveAccountPair({
+        module:          context.module,
+        transactionType: transactionType || 'unknown',
+        side,
+        actualAccount:   wrongAccountMatch.account,
+        expectedAccount: exp.account,
+        context,
+      });
+
       issues.push({
         type:     'WRONG_ACCOUNT',
         severity: 'high',
         ...ROOT_CAUSES.WRONG_ACCOUNT,
-        detail: `Account ${wrongAccountMatch.account} ("${getAccountName(wrongAccountMatch.account, countryCode)}") used.  Expected: ${exp.account} ("${getAccountName(exp.account, countryCode)}")`,
-        actualAccount:   wrongAccountMatch.account,
-        expectedAccount: exp.account,
+        detail: `Account ${wrongAccountMatch.account} ("${getAccountName(wrongAccountMatch.account, countryCode)}") used. Expected: ${exp.account} ("${getAccountName(exp.account, countryCode)}")`,
+        fix:              pair.comparison?.actionRequired || ROOT_CAUSES.WRONG_ACCOUNT.fix,
+        actualAccount:    wrongAccountMatch.account,
+        expectedAccount:  exp.account,
+        actualSource:     pair.actual,
+        expectedSource:   pair.expected,
+        sourceComparison: pair.comparison,
       });
     } else {
-      const side = (exp.debit || 0) > 0 ? 'DR' : 'CR';
-      const amt  = (exp.debit || 0) || (exp.credit || 0);
+      // Entry completely missing
+      const side    = (exp.debit || 0) > 0 ? 'debit' : 'credit';
+      const amt     = (exp.debit || 0) || (exp.credit || 0);
+      const expSrc  = resolveAccountSource({
+        module: context.module, transactionType: transactionType || 'unknown',
+        side, account: exp.account, context,
+      });
+
       issues.push({
         type:     'MISSING_ENTRY',
         severity: 'high',
         ...ROOT_CAUSES.MISSING_ENTRY,
-        detail: `Expected ${side} ${amt.toFixed(2)} on ${exp.account} ("${getAccountName(exp.account, countryCode)}")`,
-        expectedAccount: exp.account,
+        detail:           `Expected ${side.toUpperCase()} ${amt.toFixed(2)} on ${exp.account} ("${getAccountName(exp.account, countryCode)}")`,
+        expectedAccount:  exp.account,
+        actualSource:     null,
+        expectedSource:   expSrc,
+        sourceComparison: {
+          sameSource:     false,
+          severity:       'missing',
+          explanation:    `Expected entry from ${expSrc.source} → "${expSrc.field}" was not posted.`,
+          actionRequired: `Verify the D365 posting process ran correctly: ${expSrc.d365Path}`,
+        },
       });
     }
   });
 
-  // Extra actual entries vs expected (known error patterns)
+  // ── Extra actual entries — known error patterns ────────────────────────────
   actualEntries.forEach(actual => {
     const isExpected = expectedEntries.some(e => e.account === actual.account);
     if (!isExpected) {
       const pattern = COMMON_ACCOUNT_ERRORS[actual.account];
-      if (pattern) {
-        issues.push({
-          type:     'WRONG_ACCOUNT',
-          severity: 'high',
-          ...ROOT_CAUSES.WRONG_ACCOUNT,
-          detail: pattern.detail,
-          actualAccount:    actual.account,
-          expectedAccounts: pattern.shouldBe,
-        });
-      }
+      if (!pattern) return;
+
+      const side = (actual.debit || 0) > 0 ? 'debit' : 'credit';
+      const pair = resolveAccountPair({
+        module: context.module, transactionType: transactionType || 'unknown',
+        side, actualAccount: actual.account, expectedAccount: pattern.shouldBe[0], context,
+      });
+
+      issues.push({
+        type:     'WRONG_ACCOUNT',
+        severity: 'high',
+        ...ROOT_CAUSES.WRONG_ACCOUNT,
+        detail:           pattern.detail,
+        fix:              pair.comparison?.actionRequired || ROOT_CAUSES.WRONG_ACCOUNT.fix,
+        actualAccount:    actual.account,
+        expectedAccounts: pattern.shouldBe,
+        actualSource:     pair.actual,
+        expectedSource:   pair.expected,
+        sourceComparison: pair.comparison,
+      });
     }
   });
 
-  // PMA check
+  // ── PMA check ─────────────────────────────────────────────────────────────
   if (context.pma && context.gaap === 'french_gaap' && transactionType === 'depreciation') {
     const hasPMA = actualEntries.some(e =>
       e.account.startsWith('687') || e.account.startsWith('1510') || e.account.startsWith('15')
     );
     if (!hasPMA) {
+      const expSrc = resolveAccountSource({
+        module: context.module, transactionType: 'depreciation', side: 'debit',
+        account: '68725', context,
+      });
       issues.push({
         type:     'PMA_NOT_POSTED',
         severity: 'medium',
         ...ROOT_CAUSES.PMA_NOT_POSTED,
-        detail: 'PMA is active but no provision entry found in this scenario.',
+        detail:           'PMA is active but no provision entry found in this scenario.',
+        actualSource:     null,
+        expectedSource:   expSrc,
+        sourceComparison: {
+          sameSource:     false,
+          severity:       'missing',
+          explanation:    `PMA entry missing. Expected from ${expSrc.source} → "${expSrc.field}".`,
+          actionRequired: `Configure PMA in: ${expSrc.d365Path}`,
+        },
       });
     }
   }
 
   const status =
-    issues.length === 0                                    ? 'clean'    :
-    issues.some(i => i.severity === 'critical')            ? 'critical' :
-    issues.some(i => i.severity === 'high')                ? 'error'    : 'warning';
+    issues.length === 0                                 ? 'clean'    :
+    issues.some(i => i.severity === 'critical')         ? 'critical' :
+    issues.some(i => i.severity === 'high')             ? 'error'    : 'warning';
 
   return {
     id: idx + 1,
@@ -186,7 +240,7 @@ function categoriseIssues(voucherResults) {
   return cats;
 }
 
-// ─── D365 driver suggestions ──────────────────────────────────────────────────
+// ─── D365 driver suggestions (source-aware) ───────────────────────────────────
 function buildD365Drivers(issues, context, transactionType) {
   const seen = new Set();
   const drivers = [];
@@ -194,37 +248,39 @@ function buildD365Drivers(issues, context, transactionType) {
   const add = (d) => { if (!seen.has(d.driver)) { seen.add(d.driver); drivers.push(d); } };
 
   issues.forEach(issue => {
+    // Use resolver-provided paths when available
+    if (issue.type === 'WRONG_ACCOUNT' && issue.actualSource) {
+      add({
+        driver:   issue.actualSource.source,
+        path:     issue.expectedSource?.d365Path || issue.actualSource.d365Path,
+        action:   issue.sourceComparison?.actionRequired || `Update account mapping for: ${transactionType}`,
+        priority: 'high',
+      });
+      return;
+    }
+
     switch (issue.type) {
       case 'WRONG_ACCOUNT':
-        if (context.module === 'lease') {
-          add({ driver: 'Lease Posting Profile',
-                path:   'Lease ▸ Setup ▸ Lease Posting Profiles',
-                action: `Update "${transactionType || 'transaction'}" account mapping`,
-                priority: 'high' });
-        } else {
-          add({ driver: 'Fixed Asset Posting Profile',
-                path:   'Fixed Assets ▸ Setup ▸ Fixed Asset Posting Profiles',
-                action: `Update "${transactionType || 'transaction'}" account mapping`,
-                priority: 'high' });
-        }
+        add({ driver: context.module === 'lease' ? 'Lease Posting Profile' : 'Fixed Asset Posting Profile',
+              path: context.module === 'lease' ? 'Lease ▸ Setup ▸ Lease Posting Profiles' : 'Fixed Assets ▸ Setup ▸ Fixed Asset Posting Profiles',
+              action: `Update "${transactionType || 'transaction'}" account mapping`, priority: 'high' });
         break;
       case 'MISSING_ENTRY':
-        add({ driver: 'Batch Job Scheduler',
-              path:   'System Administration ▸ Inquiries ▸ Batch Jobs',
-              action: 'Verify periodic batch jobs completed successfully',
-              priority: 'medium' });
+        add({ driver: 'Batch Job Scheduler', path: 'System Administration ▸ Inquiries ▸ Batch Jobs',
+              action: 'Verify periodic batch jobs completed successfully', priority: 'medium' });
         break;
       case 'UNBALANCED_VOUCHER':
-        add({ driver: 'Subledger Reconciliation',
-              path:   'General Ledger ▸ Periodic Tasks ▸ Subledger Journal Accounting Entries',
-              action: 'Run reconciliation to identify and fix imbalance',
-              priority: 'critical' });
+        add({ driver: 'Subledger Reconciliation', path: 'General Ledger ▸ Periodic Tasks ▸ Subledger Journal Accounting Entries',
+              action: 'Run reconciliation to identify and fix imbalance', priority: 'critical' });
         break;
       case 'PMA_NOT_POSTED':
-        add({ driver: 'French Regulatory Parameters',
-              path:   'Fixed Assets ▸ Setup ▸ Fixed Asset Parameters ▸ French Regulatory',
-              action: 'Enable PMA and configure posting accounts',
-              priority: 'medium' });
+        if (issue.expectedSource) {
+          add({ driver: 'FrenchRegulatoryParameters', path: issue.expectedSource.d365Path,
+                action: 'Enable PMA and configure posting accounts', priority: 'medium' });
+        } else {
+          add({ driver: 'French Regulatory Parameters', path: 'Fixed Assets ▸ Setup ▸ Fixed Asset Parameters ▸ French Regulatory',
+                action: 'Enable PMA and configure posting accounts', priority: 'medium' });
+        }
         break;
     }
   });
@@ -244,6 +300,7 @@ function buildSummary(results) {
     warningCount:   0,
     issuesByType:   {},
     overallStatus:  'clean',
+    sourceBreakdown: {},   // NEW: count issues per source name
   };
 
   const collect = (issues) => {
@@ -253,6 +310,12 @@ function buildSummary(results) {
       else if (issue.severity === 'high')     summary.errorCount++;
       else                                    summary.warningCount++;
       summary.issuesByType[issue.type] = (summary.issuesByType[issue.type] || 0) + 1;
+
+      // Track which sources have issues
+      if (issue.actualSource?.source) {
+        const src = issue.actualSource.source;
+        summary.sourceBreakdown[src] = (summary.sourceBreakdown[src] || 0) + 1;
+      }
     });
   };
 
@@ -275,6 +338,11 @@ function buildSummary(results) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([type, count]) => ({ type, count, title: ROOT_CAUSES[type]?.title || type }));
+
+  summary.topSources = Object.entries(summary.sourceBreakdown)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([source, count]) => ({ source, count }));
 
   return summary;
 }

@@ -7,6 +7,7 @@ const {
 } = require('docx');
 const fs = require('fs');
 const { ROOT_CAUSES } = require('./accountingRules');
+const { traceToText, confidenceLabel } = require('./accountSourceResolver');
 
 // ─── Shared style constants ───────────────────────────────────────────────────
 const C = {
@@ -47,6 +48,7 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
   }
 
   addRootCauseSheet(wb, diagnosticResult.summary);
+  addAccountSourceSheet(wb, diagnosticResult);
 
   await wb.xlsx.writeFile(filePath);
 }
@@ -274,7 +276,10 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
           ...scenarioSection(diagnosticResult.scenarioAnalysis),
         ] : []),
 
-        heading2('6.  D365 CONFIGURATION RECOMMENDATIONS'),
+        heading2('6.  ACCOUNT SOURCE DETERMINATION'),
+        ...accountSourceSection(diagnosticResult),
+
+        heading2('7.  D365 CONFIGURATION RECOMMENDATIONS'),
         ...recommendations(diagnosticResult, context),
 
         spacer(),
@@ -444,6 +449,179 @@ function recommendations(result, context) {
     parts.push(para('Navigate to: System Administration ▸ Inquiries ▸ Batch Jobs', { color: '2563EB', after: 60 }));
     parts.push(para('Confirm that all periodic D365 batch jobs (depreciation, interest accrual, etc.) have completed without errors.', { after: 180 }));
   }
+
+  return parts;
+}
+
+// ─── Account Source Analysis — Excel sheet ────────────────────────────────────
+function addAccountSourceSheet(wb, diagnosticResult) {
+  const ws = wb.addWorksheet('Account Source Analysis');
+
+  ws.columns = [
+    { header: 'Voucher / Scenario', key: 'voucherId',  width: 22 },
+    { header: 'Account',            key: 'account',    width: 12 },
+    { header: 'Side',               key: 'side',       width: 8  },
+    { header: 'Issue Type',         key: 'issueType',  width: 22 },
+    { header: 'Actual Source',      key: 'actSrc',     width: 26 },
+    { header: 'Actual Field',       key: 'actField',   width: 30 },
+    { header: 'Confidence',         key: 'actConf',    width: 12 },
+    { header: 'Expected Source',    key: 'expSrc',     width: 26 },
+    { header: 'Expected Field',     key: 'expField',   width: 30 },
+    { header: 'Source Match',       key: 'srcMatch',   width: 14 },
+    { header: 'D365 Fix Path',      key: 'fixPath',    width: 55 },
+    { header: 'Resolution Trace',   key: 'trace',      width: 65 },
+  ];
+
+  ws.getRow(1).eachCell(cell => {
+    cell.fill = fill(C.navy);
+    cell.font = { bold: true, color: { argb: C.white } };
+    cell.alignment = { horizontal: 'center', wrapText: true };
+  });
+  ws.getRow(1).height = 28;
+
+  const confFill = { High: 'FF166534', Medium: 'FF713F12', Low: 'FF1E293B' };
+  const confColor= { High: 'FF86EFAC', Medium: 'FFFCD34D', Low: 'FF94A3B8' };
+  const matchFill= { true: 'FF052E16', false: 'FF450A0A' };
+
+  // Collect all source-enriched issues
+  const rows = [];
+
+  const addIssues = (issues, voucherId) => {
+    issues.forEach(issue => {
+      if (!issue.actualSource && !issue.expectedSource) return;
+      const entry = issue._entry;
+      rows.push({
+        voucherId,
+        account:  entry?.account || issue.actualAccount || issue.expectedAccount || '–',
+        side:     entry ? (entry.debit > 0 ? 'DR' : 'CR') : '–',
+        issueType: issue.type,
+        actSrc:   issue.actualSource?.source   || '–',
+        actField: issue.actualSource?.field    || '–',
+        actConf:  issue.actualSource?.confidence || '–',
+        expSrc:   issue.expectedSource?.source || '–',
+        expField: issue.expectedSource?.field  || '–',
+        srcMatch: issue.sourceComparison?.sameSource != null
+                    ? (issue.sourceComparison.sameSource ? 'SAME' : 'DIFF')
+                    : '–',
+        fixPath:  issue.sourceComparison?.actionRequired || issue.expectedSource?.d365Path || '–',
+        trace:    issue.actualSource?.trace ? traceToText(issue.actualSource.trace).join('  |  ') : '–',
+      });
+    });
+  };
+
+  if (diagnosticResult.voucherAnalysis) {
+    Object.values(diagnosticResult.voucherAnalysis).forEach(sheet =>
+      sheet.vouchers.forEach(v => addIssues(v.issues, v.voucherId))
+    );
+  }
+  if (diagnosticResult.scenarioAnalysis) {
+    diagnosticResult.scenarioAnalysis.findings.forEach(f =>
+      addIssues(f.issues, `Scenario ${f.id}: ${f.description}`)
+    );
+  }
+
+  if (rows.length === 0) {
+    ws.addRow({ voucherId: 'No source-enriched issues found', account: '', side: '', issueType: '', actSrc: '', actField: '', actConf: '', expSrc: '', expField: '', srcMatch: '', fixPath: '', trace: '' });
+    return;
+  }
+
+  rows.forEach(r => {
+    const row = ws.addRow(r);
+    // Confidence cell
+    const cKey = r.actConf;
+    if (confFill[cKey]) {
+      row.getCell('actConf').fill  = fill(confFill[cKey]);
+      row.getCell('actConf').font  = { color: { argb: confColor[cKey] }, bold: true, size: 11 };
+    }
+    // Source match cell
+    const isMatch = r.srcMatch === 'SAME';
+    if (r.srcMatch !== '–') {
+      row.getCell('srcMatch').fill = fill(isMatch ? 'FF052E16' : 'FF450A0A');
+      row.getCell('srcMatch').font = { color: { argb: isMatch ? 'FF86EFAC' : 'FFFCA5A5' }, bold: true };
+    }
+    row.getCell('fixPath').alignment = { wrapText: true };
+    row.getCell('trace').alignment   = { wrapText: true };
+    row.height = 36;
+  });
+
+  ws.autoFilter = { from: 'A1', to: 'L1' };
+}
+
+// ─── Account Source Determination — Word section ──────────────────────────────
+function accountSourceSection(diagnosticResult) {
+  const parts = [];
+
+  const allIssues = [];
+
+  if (diagnosticResult.voucherAnalysis) {
+    Object.values(diagnosticResult.voucherAnalysis).forEach(sheet =>
+      sheet.vouchers.forEach(v =>
+        v.issues.forEach(i => {
+          if (i.actualSource || i.expectedSource) {
+            allIssues.push({ label: v.voucherId, issue: i });
+          }
+        })
+      )
+    );
+  }
+  if (diagnosticResult.scenarioAnalysis) {
+    diagnosticResult.scenarioAnalysis.findings.forEach(f =>
+      f.issues.forEach(i => {
+        if (i.actualSource || i.expectedSource) {
+          allIssues.push({ label: `Scenario ${f.id}: ${f.description}`, issue: i });
+        }
+      })
+    );
+  }
+
+  if (allIssues.length === 0) {
+    return [para('No account source analysis data available.', { color: '888888' })];
+  }
+
+  // Source breakdown table
+  const breakdown = diagnosticResult.summary?.sourceBreakdown || {};
+  if (Object.keys(breakdown).length > 0) {
+    parts.push(para('Configuration Sources with Issues:', { after: 80 }));
+    parts.push(new Table({
+      width: { size: 60, type: WidthType.PERCENTAGE },
+      rows: [
+        tRow(['D365 Source', 'Issue Count'], false, true),
+        ...Object.entries(breakdown).sort((a,b) => b[1]-a[1]).map(([src, cnt], i) =>
+          tRow([src, String(cnt)], i % 2 === 0)
+        ),
+      ],
+    }));
+    parts.push(spacer());
+  }
+
+  // Per-issue source details (up to 20)
+  allIssues.slice(0, 20).forEach(({ label, issue }) => {
+    parts.push(para(`${label}  —  ${issue.type.replace(/_/g,' ')}`, { after: 60 }));
+
+    if (issue.actualSource) {
+      parts.push(para(
+        `Actual Source: ${issue.actualSource.source} → "${issue.actualSource.field}" (${issue.actualSource.confidence} confidence)`,
+        { color: '444444', after: 40 }
+      ));
+      parts.push(para(`Path: ${issue.actualSource.d365Path}`, { color: '2563EB', after: 40 }));
+    }
+    if (issue.expectedSource) {
+      parts.push(para(
+        `Expected Source: ${issue.expectedSource.source} → "${issue.expectedSource.field}" (${issue.expectedSource.confidence} confidence)`,
+        { color: '444444', after: 40 }
+      ));
+    }
+    if (issue.sourceComparison) {
+      parts.push(para(issue.sourceComparison.explanation, { after: 40 }));
+      parts.push(para(`Action: ${issue.sourceComparison.actionRequired}`, { italics: true, color: '2563EB', after: 40 }));
+    }
+    if (issue.actualSource?.trace) {
+      const traceLines = traceToText(issue.actualSource.trace);
+      parts.push(para('Resolution Trace:', { after: 30 }));
+      traceLines.forEach(l => parts.push(bullet(l)));
+    }
+    parts.push(spacer());
+  });
 
   return parts;
 }

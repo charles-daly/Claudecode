@@ -1,0 +1,57 @@
+{
+  "_comment": "Priority-ordered source lists per module → transaction type → side (debit/credit). The resolver walks each list and returns the FIRST source whose account-prefix patterns match the journal line.",
+
+  "lease": {
+    "recognition": {
+      "label": "Lease Initial Recognition (IFRS 16 / ASC 842)",
+      "debit":  ["LeasePostingProfile", "LeaseBook", "AssetGroup", "LedgerMapping"],
+      "credit": ["LeasePostingProfile", "LeaseBook", "LedgerMapping"]
+    },
+    "depreciation": {
+      "label": "Monthly ROU Asset Depreciation",
+      "debit":  ["FrenchRegulatoryParameters", "LeasePostingProfile", "LeaseBook", "AssetGroup", "LedgerMapping"],
+      "credit": ["FrenchRegulatoryParameters", "LeasePostingProfile", "LeaseBook", "AssetGroup", "LedgerMapping"]
+    },
+    "interest_accrual": {
+      "label": "Lease Interest Accrual",
+      "debit":  ["LeasePostingProfile", "LeaseBook", "LedgerMapping"],
+      "credit": ["LeasePostingProfile", "LeaseBook", "LedgerMapping"]
+    },
+    "payment": {
+      "label": "Lease Payment (Principal + Interest Settlement)",
+      "debit":  ["LeasePostingProfile", "LeaseBook", "LedgerMapping"],
+      "credit": ["BankAccountSetup", "LedgerMapping"]
+    },
+    "variable_payment": {
+      "label": "Variable / Short-term Lease Payment",
+      "debit":  ["LeasePostingProfile", "LedgerMapping"],
+      "credit": ["BankAccountSetup", "VendorPostingProfile", "LedgerMapping"]
+    }
+  },
+
+  "fixed_assets": {
+    "acquisition": {
+      "label": "Fixed Asset Acquisition",
+      "debit":  ["FixedAssetPostingProfile", "AssetGroup", "LedgerMapping"],
+      "credit": ["FixedAssetPostingProfile", "VendorPostingProfile", "LedgerMapping"]
+    },
+    "depreciation": {
+      "label": "Asset Depreciation",
+      "debit":  ["FrenchRegulatoryParameters", "FixedAssetPostingProfile", "DepreciationProfile", "AssetGroup", "LedgerMapping"],
+      "credit": ["FrenchRegulatoryParameters", "FixedAssetPostingProfile", "DepreciationProfile", "AssetGroup", "LedgerMapping"]
+    },
+    "disposal": {
+      "label": "Asset Disposal",
+      "debit":  ["FixedAssetPostingProfile", "AssetGroup", "LedgerMapping"],
+      "credit": ["FixedAssetPostingProfile", "AssetGroup", "LedgerMapping"]
+    }
+  },
+
+  "unknown": {
+    "unknown": {
+      "label": "Unknown Transaction Type",
+      "debit":  ["LeasePostingProfile", "FixedAssetPostingProfile", "FrenchRegulatoryParameters", "VendorPostingProfile", "BankAccountSetup", "LedgerMapping"],
+      "credit": ["LeasePostingProfile", "FixedAssetPostingProfile", "FrenchRegulatoryParameters", "VendorPostingProfile", "BankAccountSetup", "LedgerMapping"]
+    }
+  }
+}
