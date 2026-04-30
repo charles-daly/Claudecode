@@ -93,7 +93,7 @@ function calculateIssueImpact(entry, ga, sheetName) {
     plImpact,
     bsImpact,
     fxImpact:           0,
-    impactAmount:       impactType === 'Financial Misstatement' ? amount : amount,
+    impactAmount:       impactType === 'Financial Misstatement' ? amount : impactType === 'Classification Issue' ? 0 : amount,
     mappingStatus:      ga.mappingStatus,
     usClassification:   ga.usClassification   || '–',
     frClassification:   ga.frClassification   || '–',
@@ -110,7 +110,7 @@ function calculateIssueImpact(entry, ga, sheetName) {
 
 function calculateFxImpact(entry, sheetName, baseCurrency = 'EUR') {
   const amount       = (entry.debit || 0) || (entry.credit || 0);
-  const currency     = entry.currency     || baseCurrency;
+  const currency     = entry.transactionCurrency || entry.currency || baseCurrency;
   const exchangeRate = entry.exchangeRate || 1;
 
   if (!amount || currency === baseCurrency || Math.abs(exchangeRate - 1) < 0.0001) return null;

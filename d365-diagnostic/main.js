@@ -155,6 +155,27 @@ ipcMain.handle('data:generateSampleExcel', async () => {
   }
 });
 
+// ─── IPC: Run automated test suite ───────────────────────────
+ipcMain.handle('engine:runTests', async () => {
+  try {
+    const { runAllTests } = require('./src/engine/testEngine');
+    const result = runAllTests();
+    return { success: true, result };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ─── IPC: Fetch engine logs ───────────────────────────────────
+ipcMain.handle('engine:getLogs', async (_event, filter = {}) => {
+  try {
+    const logger = require('./src/engine/logger');
+    return { success: true, logs: logger.getLogs(filter), stats: logger.stats() };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // ─── IPC: Reveal file in Explorer ────────────────────────────
 ipcMain.handle('shell:showFile', async (_event, filePath) => {
   shell.showItemInFolder(filePath);

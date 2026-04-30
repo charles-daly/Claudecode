@@ -31,7 +31,7 @@ function analyseVoucher(voucher, context) {
       severity: 'critical',
       code:     ROOT_CAUSES.UNBALANCED_VOUCHER.code,
       title:    ROOT_CAUSES.UNBALANCED_VOUCHER.title,
-      detail:   `Imbalance of ${voucher.imbalance.toFixed(2)}. DR = ${voucher.totalDebit.toFixed(2)},  CR = ${voucher.totalCredit.toFixed(2)}`,
+      detail:   `Imbalance of ${(voucher.imbalance ?? 0).toFixed(2)}. DR = ${(voucher.totalDebit ?? 0).toFixed(2)},  CR = ${(voucher.totalCredit ?? 0).toFixed(2)}`,
       fix:      ROOT_CAUSES.UNBALANCED_VOUCHER.fix,
       actualSource:     null,
       expectedSource:   null,

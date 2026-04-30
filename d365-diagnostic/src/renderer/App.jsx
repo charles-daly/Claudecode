@@ -9,7 +9,9 @@ import VoucherAnalysis from './components/VoucherAnalysis';
 import ExportPanel from './components/ExportPanel';
 import GaapMapping from './components/GaapMapping';
 import FinancialImpact from './components/FinancialImpact';
-import FxAnalysis from './components/FxAnalysis';
+import FxAnalysis   from './components/FxAnalysis';
+import DebugPanel   from './components/DebugPanel';
+import TestRunner   from './components/TestRunner';
 
 const DEFAULT_CONTEXT = {
   module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false,
@@ -272,6 +274,8 @@ export default function App() {
       case 'impact':    return <FinancialImpact result={diagnosticResult} setActiveTab={setActiveTab} />;
       case 'fx':        return <FxAnalysis result={diagnosticResult} />;
       case 'export':    return <ExportPanel diagnosticResult={diagnosticResult} context={context} />;
+      case 'debug':     return <DebugPanel result={diagnosticResult} />;
+      case 'tests':     return <TestRunner />;
       case 'samples':   return <SamplePanel onLoad={loadSample} />;
       default:          return null;
     }

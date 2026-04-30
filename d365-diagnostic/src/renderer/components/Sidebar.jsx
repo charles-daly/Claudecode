@@ -10,6 +10,8 @@ const TABS = [
   { id: 'impact',    icon: '💰', label: 'Fin. Impact',  sub: 'P&L / BS / FX', requiresResult: true },
   { id: 'fx',        icon: '💱', label: 'FX Analysis',  sub: 'Gain / Loss',   requiresResult: true },
   { id: 'export',    icon: '📤', label: 'Export',       sub: 'Excel / Word',  requiresResult: true },
+  { id: 'debug',     icon: '🐛', label: 'Debug Info',   sub: 'Engine log',    requiresResult: true },
+  { id: 'tests',     icon: '🧪', label: 'Test Runner',  sub: 'Self-test' },
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, hasResult }) {

@@ -9,6 +9,7 @@ const { validateDualGaap } = require('./gaapValidationEngine');
 const { runFinancialImpact } = require('./financialImpactEngine');
 const { runCurrencyAnalysis, analyseVoucherCurrency } = require('./currencyEngine');
 const { runFxGainLossAnalysis } = require('./fxGainLossEngine');
+const logger = require('./logger');
 
 /**
  * Master diagnostic runner.
@@ -16,6 +17,10 @@ const { runFxGainLossAnalysis } = require('./fxGainLossEngine');
  * enriched with Universal Accounting Model fields per issue.
  */
 function runDiagnostic({ context, scenarios = [], voucherData = null }) {
+  logger.info('DiagnosticEngine', 'runDiagnostic started', {
+    module: context.module, gaap: context.gaap, pma: context.pma,
+    scenarioCount: scenarios.length, hasVoucherData: !!voucherData,
+  });
   const mod = moduleLoader.loadModule(context.module || 'lease');
 
   const results = {
@@ -39,6 +44,14 @@ function runDiagnostic({ context, scenarios = [], voucherData = null }) {
   results.fxGainLoss      = results.voucherAnalysis
     ? runFxGainLossAnalysis(results.voucherAnalysis, context, {})
     : null;
+
+  logger.info('DiagnosticEngine', 'runDiagnostic complete', {
+    overallStatus:  results.summary?.overallStatus,
+    totalIssues:    results.summary?.totalIssues,
+    hasFinancialImpact: !!results.financialImpact,
+    hasFxGainLoss:  !!results.fxGainLoss,
+  });
+
   return results;
 }
 
@@ -318,11 +331,20 @@ function analyseVoucherData(voucherData, context) {
       currenciesUsed:        [...new Set(voucherResults.flatMap(v => v.currencyAnalysis?.currencies || []))],
     };
 
+    const cleanCount    = voucherResults.filter(v => v.status === 'clean').length;
+    const issueCount    = voucherResults.filter(v => v.status !== 'clean').length;
+    const criticalCount = voucherResults.filter(v => v.severity === 'critical').length;
+    logger.debug('DiagnosticEngine', `Sheet "${sheetName}": ${voucherResults.length} vouchers analysed`, {
+      clean: cleanCount, issues: issueCount, critical: criticalCount,
+      isDualGaap: gaapValidation.isDualGaap,
+      isMultiCurrency: currencySummary.multiCurrencyVouchers > 0,
+    });
+
     sheetResults[sheetName] = {
       totalVouchers:    voucherResults.length,
-      cleanVouchers:    voucherResults.filter(v => v.status === 'clean').length,
-      issueVouchers:    voucherResults.filter(v => v.status !== 'clean').length,
-      criticalVouchers: voucherResults.filter(v => v.severity === 'critical').length,
+      cleanVouchers:    cleanCount,
+      issueVouchers:    issueCount,
+      criticalVouchers: criticalCount,
       vouchers:         voucherResults,
       issueCategories:  categoriseIssues(voucherResults),
       stats:            sheetData.stats,

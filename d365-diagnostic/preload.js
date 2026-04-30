@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadSampleData:       ()              => ipcRenderer.invoke('data:loadSample'),
   generateSampleExcel:  ()              => ipcRenderer.invoke('data:generateSampleExcel'),
   showFile:             (path)          => ipcRenderer.invoke('shell:showFile', path),
+  runTests:             ()              => ipcRenderer.invoke('engine:runTests'),
+  getLogs:              (filter)        => ipcRenderer.invoke('engine:getLogs', filter),
   gaapGetAll:           ()              => ipcRenderer.invoke('gaap:getAll'),
   gaapAdd:              (mapping)       => ipcRenderer.invoke('gaap:add', mapping),
   gaapUpdate:           (id, updates)   => ipcRenderer.invoke('gaap:update', id, updates),
