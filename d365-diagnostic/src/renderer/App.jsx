@@ -8,6 +8,7 @@ import DiagnosticResults from './components/DiagnosticResults';
 import VoucherAnalysis from './components/VoucherAnalysis';
 import ExportPanel from './components/ExportPanel';
 import GaapMapping from './components/GaapMapping';
+import FinancialImpact from './components/FinancialImpact';
 
 const DEFAULT_CONTEXT = {
   module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false,
@@ -266,6 +267,7 @@ export default function App() {
       case 'gaap':      return <GaapMapping />;
       case 'results':   return <DiagnosticResults result={diagnosticResult} isRunning={isRunning} />;
       case 'vouchers':  return <VoucherAnalysis result={diagnosticResult} />;
+      case 'impact':    return <FinancialImpact result={diagnosticResult} setActiveTab={setActiveTab} />;
       case 'export':    return <ExportPanel diagnosticResult={diagnosticResult} context={context} />;
       case 'samples':   return <SamplePanel onLoad={loadSample} />;
       default:          return null;

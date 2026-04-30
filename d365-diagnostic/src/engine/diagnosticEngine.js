@@ -6,6 +6,7 @@ const { resolveAccountSource, resolveAccountPair } = require('./accountSourceRes
 const { moduleLoader } = require('./moduleLoader');
 const { analyseAccrualScenario } = require('./accrualEngine');
 const { validateDualGaap } = require('./gaapValidationEngine');
+const { runFinancialImpact } = require('./financialImpactEngine');
 
 /**
  * Master diagnostic runner.
@@ -32,6 +33,7 @@ function runDiagnostic({ context, scenarios = [], voucherData = null }) {
   }
 
   results.summary = buildSummary(results);
+  results.financialImpact = runFinancialImpact(results, context) || null;
   return results;
 }
 

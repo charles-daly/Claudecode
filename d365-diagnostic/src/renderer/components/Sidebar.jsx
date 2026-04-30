@@ -7,6 +7,7 @@ const TABS = [
   { id: 'gaap',      icon: '🗂', label: 'GAAP Mapping', sub: 'US ↔ FR Accounts' },
   { id: 'results',   icon: '🔍', label: 'Diagnostic',   sub: 'Results & Findings', requiresResult: true },
   { id: 'vouchers',  icon: '📊', label: 'Vouchers',     sub: 'Drill-down', requiresResult: true },
+  { id: 'impact',    icon: '💰', label: 'Fin. Impact',  sub: 'P&L / BS / FX', requiresResult: true },
   { id: 'export',    icon: '📤', label: 'Export',       sub: 'Excel / Word', requiresResult: true },
 ];
 

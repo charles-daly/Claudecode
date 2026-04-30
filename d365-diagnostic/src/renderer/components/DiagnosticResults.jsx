@@ -28,7 +28,8 @@ export default function DiagnosticResults({ result, isRunning }) {
     );
   }
 
-  const { summary, scenarioAnalysis, voucherAnalysis } = result;
+  const { summary, scenarioAnalysis, voucherAnalysis, financialImpact } = result;
+  const fi = financialImpact;
 
   return (
     <div>
@@ -51,6 +52,58 @@ export default function DiagnosticResults({ result, isRunning }) {
         <NumCard value={summary?.errorCount    || 0} label="High Severity" color={summary?.errorCount    > 0 ? '#f97316' : '#64748b'} />
         <NumCard value={summary?.warningCount  || 0} label="Warnings"      color={summary?.warningCount  > 0 ? '#f59e0b' : '#64748b'} />
       </div>
+
+      {/* ── Financial Impact summary strip (when dual-GAAP data is present) ── */}
+      {fi && (
+        <div style={{ ...S.card, marginBottom: 16, borderColor: '#7c3aed33', background: '#13111c' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: .8 }}>
+              Financial Impact
+            </span>
+            <span style={{
+              fontSize: 10, padding: '2px 8px', borderRadius: 999,
+              background: fi.summary.overallSeverity === 'High' ? '#450a0a' : fi.summary.overallSeverity === 'Medium' ? '#431407' : '#1e293b',
+              color: fi.summary.overallSeverity === 'High' ? '#fca5a5' : fi.summary.overallSeverity === 'Medium' ? '#fdba74' : '#94a3b8',
+              fontWeight: 700, textTransform: 'uppercase',
+            }}>{fi.summary.overallSeverity}</span>
+            <span style={{ fontSize: 11, color: '#475569', marginLeft: 'auto' }}>
+              {fi.impacts.length} impact item{fi.impacts.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <FinImpactStat
+              label="Financial Misstatements"
+              value={`€${fi.summary.totalFinancialMisstatement.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              color="#ef4444"
+              count={fi.impacts.filter(i => i.impactType === 'Financial Misstatement').length}
+            />
+            <FinImpactStat
+              label="Classification Issues"
+              value={`€${fi.summary.totalClassificationIssues.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              color="#f97316"
+              count={fi.impacts.filter(i => i.impactType === 'Classification Issue').length}
+            />
+            <FinImpactStat
+              label="FX Exposure"
+              value={`€${fi.summary.totalFxDifference.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              color="#8b5cf6"
+              count={fi.impacts.filter(i => i.impactType === 'FX Difference').length}
+            />
+            <FinImpactStat
+              label="Missing Mappings"
+              value={`€${fi.summary.totalMissingMapping.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              color="#f59e0b"
+              count={fi.impacts.filter(i => i.impactType === 'Missing Mapping').length}
+            />
+            <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+              <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>Grand Total</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#f97316' }}>
+                €{fi.summary.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Top root causes ── */}
       {summary?.topRootCauses?.length > 0 && (
@@ -253,6 +306,16 @@ function AccrualPanel({ analysis }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function FinImpactStat({ label, value, color, count }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 10, color: '#334155' }}>{count} item{count !== 1 ? 's' : ''}</div>
     </div>
   );
 }

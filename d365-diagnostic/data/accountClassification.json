@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "Account classification metadata for US GAAP and French PCG accounts. Used by the Financial Impact Engine to enrich impact analysis with category labels.",
+    "note": "Primary P&L/BS classification is derived from account ranges in the engine. This file provides supplementary category labels."
+  },
+  "accounts": {
+    "110000": { "type": "BS",  "category": "Receivable",    "description": "Trade accounts receivable" },
+    "152000": { "type": "BS",  "category": "Asset",         "description": "ROU asset — finance lease" },
+    "159000": { "type": "BS",  "category": "Contra-Asset",  "description": "Accumulated depreciation" },
+    "200000": { "type": "BS",  "category": "Payable",       "description": "Trade accounts payable" },
+    "205000": { "type": "BS",  "category": "Accrual",       "description": "Accrued liabilities / uninvoiced receipts" },
+    "210000": { "type": "BS",  "category": "Liability",     "description": "Finance lease liability" },
+    "215000": { "type": "BS",  "category": "Payable",       "description": "Personnel payable" },
+    "400100": { "type": "P&L", "category": "Revenue",       "description": "Service revenue" },
+    "400200": { "type": "P&L", "category": "Revenue",       "description": "Product sales revenue" },
+    "500100": { "type": "P&L", "category": "COGS",          "description": "Cost of goods sold" },
+    "510000": { "type": "P&L", "category": "Expense",       "description": "Depreciation expense — fixed assets" },
+    "52000":  { "type": "P&L", "category": "Expense",       "description": "Salaries & wages expense" },
+    "550000": { "type": "P&L", "category": "Expense",       "description": "Professional services / subcontracting" },
+    "600100": { "type": "P&L", "category": "Expense",       "description": "Finance lease interest expense" },
+    "999000": { "type": "Unknown", "category": "Clearing",  "description": "Custom clearing account — classification unknown" },
+
+    "411":   { "type": "BS",  "category": "Receivable",    "description": "Trade accounts receivable (clients)" },
+    "401":   { "type": "BS",  "category": "Payable",       "description": "Trade accounts payable (suppliers)" },
+    "404":   { "type": "BS",  "category": "Payable",       "description": "Fixed asset supplier payable" },
+    "408":   { "type": "BS",  "category": "Accrual",       "description": "Accrued invoices / uninvoiced receipts" },
+    "421":   { "type": "BS",  "category": "Payable",       "description": "Personnel payable — salaries" },
+    "512":   { "type": "BS",  "category": "Cash",          "description": "Bank account" },
+    "641":   { "type": "P&L", "category": "Expense",       "description": "Salaries & wages expense" },
+    "622":   { "type": "P&L", "category": "Expense",       "description": "Professional services / subcontracting" },
+    "661":   { "type": "P&L", "category": "Expense",       "description": "Interest expense (generic)" },
+    "699":   { "type": "P&L", "category": "Expense",       "description": "Exceptional charges" },
+    "701":   { "type": "P&L", "category": "Revenue",       "description": "Product sales revenue" },
+    "706":   { "type": "P&L", "category": "Revenue",       "description": "Service revenue" },
+    "607":   { "type": "P&L", "category": "COGS",          "description": "Cost of goods sold" },
+    "6811":  { "type": "P&L", "category": "Expense",       "description": "Depreciation & amortisation charge" },
+    "6618":  { "type": "P&L", "category": "Expense",       "description": "Finance lease interest expense" },
+    "2818":  { "type": "BS",  "category": "Contra-Asset",  "description": "Accumulated depreciation — assets" },
+    "2319":  { "type": "BS",  "category": "Asset",         "description": "ROU asset — finance lease" },
+    "1681":  { "type": "BS",  "category": "Liability",     "description": "Finance lease liability (principal)" },
+    "1688":  { "type": "BS",  "category": "Accrual",       "description": "Interest payable — lease" },
+    "2154":  { "type": "BS",  "category": "Asset",         "description": "Equipment — fixed asset" },
+    "28154": { "type": "BS",  "category": "Contra-Asset",  "description": "Accumulated depreciation — equipment" }
+  }
+}

@@ -53,6 +53,7 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
   addUniversalModelSheet(wb, diagnosticResult);
   addAccrualSheet(wb, diagnosticResult, context);
   addDualGaapSheet(wb, diagnosticResult);
+  addFinancialImpactSheet(wb, diagnosticResult);
 
   await wb.xlsx.writeFile(filePath);
 }
@@ -312,6 +313,9 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
 
         heading2('10.  DUAL GAAP RECONCILIATION ANALYSIS'),
         ...dualGaapWordSection(diagnosticResult),
+
+        heading2('11.  FINANCIAL IMPACT ANALYSIS'),
+        ...financialImpactWordSection(diagnosticResult),
 
         spacer(),
         para(
@@ -1142,6 +1146,259 @@ function dualGaapWordSection(diagnosticResult) {
       });
     }
   });
+
+  return parts;
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+// FINANCIAL IMPACT ANALYSIS — Excel sheet
+// ════════════════════════════════════════════════════════════════════════════════
+function addFinancialImpactSheet(wb, diagnosticResult) {
+  const ws = wb.addWorksheet('Financial Impact');
+
+  ws.columns = [
+    { header: 'Voucher',          key: 'voucherId',    width: 20 },
+    { header: 'Date',             key: 'date',         width: 13 },
+    { header: 'Module',           key: 'module',       width: 18 },
+    { header: 'Transaction Type', key: 'txType',       width: 18 },
+    { header: 'US Account',       key: 'usAccount',    width: 12 },
+    { header: 'FR Account',       key: 'frAccount',    width: 12 },
+    { header: 'Description',      key: 'description',  width: 38 },
+    { header: 'Amount',           key: 'amount',       width: 14 },
+    { header: 'Currency',         key: 'currency',     width: 10 },
+    { header: 'Exchange Rate',    key: 'exchangeRate', width: 13 },
+    { header: 'Impact Type',      key: 'impactType',   width: 24 },
+    { header: 'Severity',         key: 'severity',     width: 11 },
+    { header: 'P&L Impact (EUR)', key: 'plImpact',     width: 16 },
+    { header: 'BS Impact (EUR)',  key: 'bsImpact',     width: 16 },
+    { header: 'FX Impact (EUR)',  key: 'fxImpact',     width: 16 },
+    { header: 'Issue',            key: 'issue',        width: 70 },
+  ];
+
+  ws.getRow(1).eachCell(cell => {
+    cell.fill = fill(C.navy);
+    cell.font = { bold: true, color: { argb: C.white } };
+    cell.alignment = { horizontal: 'center', wrapText: true };
+  });
+  ws.getRow(1).height = 28;
+
+  const fi = diagnosticResult.financialImpact;
+
+  if (!fi || fi.impacts.length === 0) {
+    ws.addRow({
+      voucherId: 'No financial impact data found. Import dual-GAAP entries (US_Account + FR_Account columns) and re-run the diagnostic.',
+    });
+    return;
+  }
+
+  // Summary header block
+  const s = fi.summary;
+  const summaryRows = [
+    ['FINANCIAL IMPACT SUMMARY', ''],
+    ['Grand Total Exposure (EUR)',          s.grandTotal],
+    ['Financial Misstatements (EUR)',        s.totalFinancialMisstatement],
+    ['Classification Issues (EUR)',          s.totalClassificationIssues],
+    ['FX Differences (EUR)',                 s.totalFxDifference],
+    ['Missing Mapping Amounts (EUR)',        s.totalMissingMapping],
+    ['P&L Exposure (EUR)',                   s.netPlImpact],
+    ['BS Exposure (EUR)',                    s.netBsImpact],
+    ['FX Exposure (EUR)',                    s.netFxImpact],
+    ['High Severity Items',                  s.highCount],
+    ['Medium Severity Items',                s.mediumCount],
+    ['Low Severity Items',                   s.lowCount],
+    ['Overall Severity',                     s.overallSeverity],
+    ['', ''],
+    ['IMPACT DETAIL', ''],
+  ];
+
+  summaryRows.forEach(([label, value]) => {
+    const row = ws.addRow({ voucherId: label, date: value == null ? '' : value });
+    if (label === 'FINANCIAL IMPACT SUMMARY' || label === 'IMPACT DETAIL') {
+      row.getCell('voucherId').fill = fill(C.navy);
+      row.getCell('voucherId').font = { bold: true, color: { argb: C.white } };
+    } else if (label) {
+      row.getCell('voucherId').font = { bold: true };
+      row.getCell('date').numFmt = typeof value === 'number' ? '#,##0.00' : undefined;
+    }
+  });
+
+  // Write a blank separator row and then column headers again for the detail section
+  ws.addRow({});
+
+  // Write all impacts (sorted: High first, then by amount descending)
+  const sorted = [...fi.impacts].sort((a, b) => {
+    const sevOrder = { High: 0, Medium: 1, Low: 2 };
+    if (sevOrder[a.severity] !== sevOrder[b.severity]) return sevOrder[a.severity] - sevOrder[b.severity];
+    return (b.impactAmount || 0) - (a.impactAmount || 0);
+  });
+
+  const typeRowFill = {
+    'Financial Misstatement': 'FFFEE2E2',
+    'Classification Issue':   'FFFFF7ED',
+    'FX Difference':          'FFF5F3FF',
+    'Missing Mapping':        'FFFEFCE8',
+  };
+  const typeFontColor = {
+    'Financial Misstatement': 'FFEF4444',
+    'Classification Issue':   'FFF97316',
+    'FX Difference':          'FF8B5CF6',
+    'Missing Mapping':        'FFF59E0B',
+  };
+  const sevFill = { High: 'FFFEE2E2', Medium: 'FFFFF7ED', Low: 'FFF1F5F9' };
+  const sevFont = { High: 'FFEF4444', Medium: 'FFF97316', Low: 'FF64748B' };
+
+  sorted.forEach(impact => {
+    const row = ws.addRow({
+      voucherId:    impact.voucherId,
+      date:         impact.date,
+      module:       impact.module,
+      txType:       impact.transactionType || '–',
+      usAccount:    impact.usAccount,
+      frAccount:    impact.frAccount,
+      description:  impact.description,
+      amount:       impact.amount,
+      currency:     impact.currency,
+      exchangeRate: impact.exchangeRate,
+      impactType:   impact.impactType,
+      severity:     impact.severity,
+      plImpact:     impact.plImpact || 0,
+      bsImpact:     impact.bsImpact || 0,
+      fxImpact:     impact.fxImpact || 0,
+      issue:        impact.issueDescription || '',
+    });
+
+    row.getCell('amount').numFmt      = '#,##0.00';
+    row.getCell('plImpact').numFmt    = '#,##0.00';
+    row.getCell('bsImpact').numFmt    = '#,##0.00';
+    row.getCell('fxImpact').numFmt    = '#,##0.00';
+    row.getCell('issue').alignment    = { wrapText: true };
+    row.height = 40;
+
+    // Row background by impact type
+    if (typeRowFill[impact.impactType]) row.fill = fill(typeRowFill[impact.impactType]);
+
+    // Impact type cell colour
+    if (typeFontColor[impact.impactType]) {
+      row.getCell('impactType').font = { bold: true, color: { argb: typeFontColor[impact.impactType] } };
+    }
+
+    // Severity cell colour
+    if (sevFill[impact.severity]) {
+      row.getCell('severity').fill = fill(sevFill[impact.severity]);
+      row.getCell('severity').font = { bold: true, color: { argb: sevFont[impact.severity] } };
+    }
+
+    // Highlight non-zero impact cells
+    if (impact.plImpact > 0) {
+      row.getCell('plImpact').font = { bold: true, color: { argb: C.red } };
+    }
+    if (impact.bsImpact > 0) {
+      row.getCell('bsImpact').font = { bold: true, color: { argb: 'FFF97316' } };
+    }
+    if (impact.fxImpact > 0) {
+      row.getCell('fxImpact').font = { bold: true, color: { argb: 'FF8B5CF6' } };
+    }
+    // Flag non-EUR currency
+    if (impact.currency !== 'EUR') {
+      row.getCell('currency').fill = fill('FFFEFCE8');
+      row.getCell('currency').font = { color: { argb: 'FFF59E0B' }, bold: true };
+    }
+  });
+
+  ws.autoFilter = { from: `A${summaryRows.length + 3}`, to: `P${summaryRows.length + 3}` };
+}
+
+// ─── Financial Impact — Word section ─────────────────────────────────────────
+function financialImpactWordSection(diagnosticResult) {
+  const fi = diagnosticResult.financialImpact;
+
+  if (!fi || fi.impacts.length === 0) {
+    return [para(
+      'No financial impact data detected. Import dual-GAAP entries (US_Account + FR_Account columns) and re-run the diagnostic to enable this analysis.',
+      { color: '888888' }
+    )];
+  }
+
+  const s  = fi.summary;
+  const ag = fi.aggregates;
+  const parts = [];
+
+  const sevColor = s.overallSeverity === 'High'   ? 'C0392B' :
+                   s.overallSeverity === 'Medium'  ? 'E67E22' : '27AE60';
+
+  parts.push(para(
+    'The Financial Impact Engine quantifies the monetary exposure introduced by each detected GAAP mapping issue. ' +
+    'Cross-type mismatements (P&L ↔ Balance Sheet) represent the most significant risk. ' +
+    'FX differences reflect translation exposure on foreign-currency transactions.',
+    { color: '333333', after: 200 }
+  ));
+
+  parts.push(para2('Overall Financial Severity: ', s.overallSeverity, sevColor));
+  parts.push(spacer());
+
+  // Executive summary table
+  parts.push(new Table({
+    width: { size: 60, type: WidthType.PERCENTAGE },
+    rows: [
+      tRow(['Metric',                      'Amount (EUR)'],           false, true),
+      tRow(['Grand Total Exposure',         `€${s.grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],               true),
+      tRow(['Financial Misstatements',      `€${s.totalFinancialMisstatement.toLocaleString('en-US', { minimumFractionDigits: 2 })}`], false),
+      tRow(['Classification Issues',        `€${s.totalClassificationIssues.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],  true),
+      tRow(['FX Differences',               `€${s.totalFxDifference.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],           false),
+      tRow(['Missing Mapping Amounts',      `€${s.totalMissingMapping.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],          true),
+      tRow(['P&L Exposure',                 `€${s.netPlImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],                  false),
+      tRow(['BS Exposure',                  `€${s.netBsImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],                  true),
+      tRow(['FX Exposure',                  `€${s.netFxImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}`],                  false),
+      tRow(['High Severity Items',          String(s.highCount)],                         true),
+      tRow(['Medium Severity Items',        String(s.mediumCount)],                       false),
+    ],
+  }));
+  parts.push(spacer());
+
+  // Module breakdown
+  if (Object.keys(ag.byModule).length > 0) {
+    parts.push(para('Impact by Module:', { after: 80 }));
+    const moduleRows = Object.entries(ag.byModule)
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([mod, data], i) =>
+        tRow([mod, `€${data.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${data.count} item${data.count !== 1 ? 's' : ''})`], i % 2 === 0)
+      );
+    parts.push(new Table({
+      width: { size: 55, type: WidthType.PERCENTAGE },
+      rows: [tRow(['Module', 'Total Exposure'], false, true), ...moduleRows],
+    }));
+    parts.push(spacer());
+  }
+
+  // Top accounts
+  if (ag.topAccounts.length > 0) {
+    parts.push(para('Top Impacted US Accounts:', { after: 80 }));
+    const acctRows = ag.topAccounts.map((a, i) =>
+      tRow([a.account, `€${a.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} — ${a.impactTypes.join(', ')}`], i % 2 === 0)
+    );
+    parts.push(new Table({
+      width: { size: 65, type: WidthType.PERCENTAGE },
+      rows: [tRow(['US Account', 'Total Exposure & Impact Types'], false, true), ...acctRows],
+    }));
+    parts.push(spacer());
+  }
+
+  // High-severity items detail
+  const highItems = fi.impacts.filter(i => i.severity === 'High').slice(0, 15);
+  if (highItems.length > 0) {
+    parts.push(para(`High-Severity Impact Items (${highItems.length}):`, { after: 80 }));
+    highItems.forEach(impact => {
+      parts.push(para(
+        `${impact.voucherId}  |  ${impact.impactType}  |  US ${impact.usAccount} → FR ${impact.frAccount}  |  Amount: ${impact.amount.toLocaleString()} ${impact.currency}`,
+        { after: 40 }
+      ));
+      parts.push(bullet(`Issue: ${impact.issueDescription}`));
+      if (impact.plImpact > 0) parts.push(bullet(`P&L Exposure: €${impact.plImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}`));
+      if (impact.bsImpact > 0) parts.push(bullet(`BS Exposure: €${impact.bsImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}`));
+      if (impact.fxImpact > 0) parts.push(bullet(`FX Exposure: €${impact.fxImpact.toLocaleString('en-US', { minimumFractionDigits: 2 })}`));
+      parts.push(spacer());
+    });
+  }
 
   return parts;
 }
