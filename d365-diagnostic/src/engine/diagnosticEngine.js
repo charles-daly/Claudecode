@@ -8,6 +8,7 @@ const { analyseAccrualScenario } = require('./accrualEngine');
 const { validateDualGaap } = require('./gaapValidationEngine');
 const { runFinancialImpact } = require('./financialImpactEngine');
 const { runCurrencyAnalysis, analyseVoucherCurrency } = require('./currencyEngine');
+const { runFxGainLossAnalysis } = require('./fxGainLossEngine');
 
 /**
  * Master diagnostic runner.
@@ -33,8 +34,11 @@ function runDiagnostic({ context, scenarios = [], voucherData = null }) {
     results.voucherAnalysis = analyseVoucherData(voucherData, context);
   }
 
-  results.summary = buildSummary(results);
+  results.summary         = buildSummary(results);
   results.financialImpact = runFinancialImpact(results, context) || null;
+  results.fxGainLoss      = results.voucherAnalysis
+    ? runFxGainLossAnalysis(results.voucherAnalysis, context, {})
+    : null;
   return results;
 }
 

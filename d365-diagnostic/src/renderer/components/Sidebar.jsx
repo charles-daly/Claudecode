@@ -8,7 +8,8 @@ const TABS = [
   { id: 'results',   icon: '🔍', label: 'Diagnostic',   sub: 'Results & Findings', requiresResult: true },
   { id: 'vouchers',  icon: '📊', label: 'Vouchers',     sub: 'Drill-down', requiresResult: true },
   { id: 'impact',    icon: '💰', label: 'Fin. Impact',  sub: 'P&L / BS / FX', requiresResult: true },
-  { id: 'export',    icon: '📤', label: 'Export',       sub: 'Excel / Word', requiresResult: true },
+  { id: 'fx',        icon: '💱', label: 'FX Analysis',  sub: 'Gain / Loss',   requiresResult: true },
+  { id: 'export',    icon: '📤', label: 'Export',       sub: 'Excel / Word',  requiresResult: true },
 ];
 
 export default function Sidebar({ activeTab, setActiveTab, hasResult }) {

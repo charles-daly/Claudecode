@@ -55,6 +55,7 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
   addDualGaapSheet(wb, diagnosticResult);
   addFinancialImpactSheet(wb, diagnosticResult);
   addCurrencySheet(wb, diagnosticResult);
+  addFxAnalysisSheet(wb, diagnosticResult);
 
   await wb.xlsx.writeFile(filePath);
 }
@@ -320,6 +321,9 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
 
         heading2('12.  MULTI-CURRENCY ANALYSIS'),
         ...currencyWordSection(diagnosticResult),
+
+        heading2('13.  FOREIGN EXCHANGE ANALYSIS'),
+        ...fxWordSection(diagnosticResult),
 
         spacer(),
         para(
@@ -1569,6 +1573,192 @@ function currencyWordSection(diagnosticResult) {
       ana.rateOverrides?.forEach(ro => {
         parts.push(bullet(`RATE_OVERRIDE on ${ro.currency}: rates ${ro.rates?.join(' vs ')}`));
         parts.push(bullet(`Fix: ${ro.fix}`));
+      });
+      parts.push(spacer());
+    });
+  });
+
+  return parts;
+}
+
+// ─── FX Analysis sheet ────────────────────────────────────────────────────────
+function addFxAnalysisSheet(wb, diagnosticResult) {
+  const fxData = diagnosticResult.fxGainLoss;
+  if (!fxData?.sheetResults) return;
+
+  const acctgCcy = fxData.accountingCurrency || 'EUR';
+  const rows = [];
+
+  Object.entries(fxData.sheetResults).forEach(([sheetName, sheetResult]) => {
+    Object.values(sheetResult.voucherFxMap || {}).forEach(vFx => {
+      vFx.fxLines.forEach((line, idx) => {
+        rows.push({
+          sheetName,
+          voucherId:                vFx.voucherId,
+          lineNo:                   idx + 1,
+          account:                  line.account,
+          description:              line.description || '',
+          originalCurrency:         line.originalCurrency,
+          originalAmount:           line.originalAmount,
+          originalRate:             line.originalExchangeRate,
+          originalAcctg:            line.originalAccountingAmount,
+          currentRate:              line.currentExchangeRate,
+          currentAcctg:             line.currentAccountingAmount,
+          fxDifference:             line.economicFxDiff,
+          type:                     line.type,
+          gainOrLoss:               line.gainOrLoss,
+          side:                     line.side,
+          isSettled:                vFx.isSettled ? 'Yes' : 'No',
+        });
+      });
+    });
+  });
+
+  if (rows.length === 0) return;
+
+  const ws = wb.addWorksheet('FX Analysis');
+  ws.columns = [
+    { header: 'Sheet',          key: 'sheetName',         width: 22 },
+    { header: 'Voucher',        key: 'voucherId',         width: 18 },
+    { header: 'Line',           key: 'lineNo',            width: 6  },
+    { header: 'Account',        key: 'account',           width: 10 },
+    { header: 'Description',    key: 'description',       width: 40 },
+    { header: 'Ccy',            key: 'originalCurrency',  width: 7  },
+    { header: 'Original Amt',   key: 'originalAmount',    width: 14 },
+    { header: 'Orig Rate',      key: 'originalRate',      width: 11 },
+    { header: `Orig ${acctgCcy}`, key: 'originalAcctg',   width: 14 },
+    { header: 'Cur Rate',       key: 'currentRate',       width: 11 },
+    { header: `Cur ${acctgCcy}`,  key: 'currentAcctg',    width: 14 },
+    { header: `FX Diff (${acctgCcy})`, key: 'fxDifference', width: 14 },
+    { header: 'Type',           key: 'type',              width: 12 },
+    { header: 'Gain / Loss',    key: 'gainOrLoss',        width: 12 },
+    { header: 'Side',           key: 'side',              width: 8  },
+    { header: 'Settled',        key: 'isSettled',         width: 9  },
+  ];
+
+  const hdr = ws.getRow(1);
+  hdr.font = { bold: true, color: { argb: C.white }, size: 11 };
+  hdr.fill = fill('FF14532D');
+  hdr.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  hdr.height = 28;
+
+  rows.forEach(r => {
+    const row = ws.addRow(r);
+    const bgArgb =
+      r.gainOrLoss === 'gain'    ? 'FFF0FFF4' :
+      r.gainOrLoss === 'loss'    ? 'FFFEE2E2' : 'FFF8FAFC';
+    row.fill = fill(bgArgb);
+
+    const diffCell = row.getCell('fxDifference');
+    diffCell.font = {
+      bold: true,
+      color: { argb: r.gainOrLoss === 'gain' ? 'FF16A34A' : r.gainOrLoss === 'loss' ? C.red : 'FF64748B' },
+    };
+    diffCell.numFmt = '+#,##0.00;-#,##0.00;0.00';
+
+    const glCell = row.getCell('gainOrLoss');
+    glCell.font = {
+      bold: true,
+      color: { argb: r.gainOrLoss === 'gain' ? 'FF16A34A' : r.gainOrLoss === 'loss' ? C.red : 'FF64748B' },
+    };
+
+    const typeCell = row.getCell('type');
+    typeCell.font = {
+      color: { argb: r.type === 'realized' ? 'FF16A34A' : 'FFF59E0B' },
+    };
+
+    for (const k of ['originalAmount','originalAcctg','currentAcctg']) {
+      row.getCell(k).numFmt = '#,##0.00';
+    }
+    for (const k of ['originalRate','currentRate']) {
+      row.getCell(k).numFmt = '0.0000';
+    }
+    row.getCell('description').alignment = { wrapText: true };
+  });
+
+  // Summary rows at bottom
+  ws.addRow([]);
+  const totals = ws.addRow({
+    sheetName: 'TOTAL', voucherId: '', lineNo: '',
+    account: '', description: '',
+    originalCurrency: '', originalAmount: '', originalRate: '',
+    originalAcctg: '', currentRate: '',
+    currentAcctg: '',
+    fxDifference: fxData.netFx,
+    type: '',
+    gainOrLoss: fxData.netFx > 0 ? 'NET GAIN' : fxData.netFx < 0 ? 'NET LOSS' : 'NEUTRAL',
+    side: '', isSettled: '',
+  });
+  totals.font = { bold: true };
+  totals.fill = fill(fxData.netFx > 0 ? 'FFD1FAE5' : fxData.netFx < 0 ? 'FFFEE2E2' : 'FFF1F5F9');
+  totals.getCell('fxDifference').numFmt = '+#,##0.00;-#,##0.00;0.00';
+
+  ws.autoFilter = { from: 'A1', to: 'P1' };
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+// ─── FX Word section ──────────────────────────────────────────────────────────
+function fxWordSection(diagnosticResult) {
+  const fxData = diagnosticResult.fxGainLoss;
+  const parts  = [];
+
+  if (!fxData || !fxData.sheetResults) {
+    parts.push(para('No foreign exchange data available.', { color: '888888', italics: true }));
+    return parts;
+  }
+
+  const acctgCcy = fxData.accountingCurrency || 'EUR';
+  const hasFx    = Object.values(fxData.sheetResults).some(s => s.fxVoucherCount > 0);
+
+  if (!hasFx) {
+    parts.push(para(`All entries are in the accounting currency (${acctgCcy}). No FX gain/loss to report.`, { color: '888888', italics: true }));
+    return parts;
+  }
+
+  const netLabel = fxData.netFx > 0 ? 'NET FX GAIN' : fxData.netFx < 0 ? 'NET FX LOSS' : 'NET NEUTRAL';
+
+  parts.push(new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({ children: [
+        new TableCell({ children: [para('Accounting Currency')], shading: { fill: 'D1FAE5', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(acctgCcy)] }),
+        new TableCell({ children: [para('Total FX Gain')], shading: { fill: 'D1FAE5', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(`${acctgCcy} ${fxData.totalGain.toLocaleString('en-US', { minimumFractionDigits: 2 })}`)] }),
+      ]}),
+      new TableRow({ children: [
+        new TableCell({ children: [para('Net FX Position')], shading: { fill: 'D1FAE5', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(`${netLabel}: ${acctgCcy} ${Math.abs(fxData.netFx).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)] }),
+        new TableCell({ children: [para('Total FX Loss')], shading: { fill: 'FEE2E2', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(`${acctgCcy} ${Math.abs(fxData.totalLoss).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)] }),
+      ]}),
+    ],
+  }));
+  parts.push(spacer());
+
+  Object.entries(fxData.sheetResults).forEach(([sheetName, sheetResult]) => {
+    if (!sheetResult.fxVoucherCount) return;
+    parts.push(para(sheetName, { bold: true, size: 24 }));
+
+    Object.values(sheetResult.voucherFxMap).forEach(vFx => {
+      const typeLabel = vFx.isSettled ? 'Realized' : 'Unrealized';
+      parts.push(para(
+        `Voucher: ${vFx.voucherId}  |  Status: ${typeLabel}  |  Gain: ${acctgCcy} ${vFx.totalGain.toFixed(2)}  |  Loss: ${acctgCcy} ${Math.abs(vFx.totalLoss).toFixed(2)}  |  Net: ${acctgCcy} ${vFx.netFx.toFixed(2)}`,
+        { size: 20, color: '444444' }
+      ));
+      vFx.fxLines.forEach(line => {
+        if (Math.abs(line.economicFxDiff) < 0.005) return;
+        const glLabel = line.gainOrLoss === 'gain' ? 'GAIN' : line.gainOrLoss === 'loss' ? 'LOSS' : 'NEUTRAL';
+        parts.push(bullet(
+          `Account ${line.account}: ${line.originalCurrency} ${line.originalAmount.toLocaleString('en')} × ` +
+          `${line.originalExchangeRate.toFixed(4)} → ${line.currentExchangeRate.toFixed(4)} = ` +
+          `${line.gainOrLoss === 'gain' ? '+' : ''}${line.economicFxDiff.toFixed(2)} ${acctgCcy} [${glLabel}, ${typeLabel}]`
+        ));
+        if (line.journalSuggestion) {
+          line.journalSuggestion.entries.forEach(je =>
+            parts.push(bullet(`  ${je.side.toUpperCase()} ${je.account}  ${acctgCcy} ${je.amount.toFixed(2)}  — ${je.note}`))
+          );
+        }
       });
       parts.push(spacer());
     });

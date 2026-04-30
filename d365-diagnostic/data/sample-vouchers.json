@@ -155,5 +155,59 @@
     ],
     "vouchers": {},
     "stats": { "totalEntries": 6, "uniqueVouchers": 3 }
+  },
+  "FX Analysis": {
+    "entries": [
+      {
+        "voucher": "FX-2024-001", "date": "2024-05-01", "module": "Sales",
+        "account": "411", "description": "Trade Receivable – US Customer  [REALIZED GAIN: USD strengthened 0.90 → 0.95]",
+        "debit": 50000, "credit": 0,
+        "transactionCurrency": "USD", "exchangeRate": 0.90, "spotRate": 0.95, "isSettled": true
+      },
+      {
+        "voucher": "FX-2024-001", "date": "2024-05-01", "module": "Sales",
+        "account": "701", "description": "Product Revenue – US Customer",
+        "debit": 0, "credit": 50000,
+        "transactionCurrency": "USD", "exchangeRate": 0.90, "spotRate": 0.95, "isSettled": true
+      },
+      {
+        "voucher": "FX-2024-002", "date": "2024-05-15", "module": "Procurement",
+        "account": "607", "description": "COGS – UK Supplier  [UNREALIZED LOSS: GBP strengthened 1.17 → 1.22]",
+        "debit": 30000, "credit": 0,
+        "transactionCurrency": "GBP", "exchangeRate": 1.17, "spotRate": 1.22, "isSettled": false
+      },
+      {
+        "voucher": "FX-2024-002", "date": "2024-05-15", "module": "Procurement",
+        "account": "401", "description": "Supplier Payable – UK Supplier  [open position]",
+        "debit": 0, "credit": 30000,
+        "transactionCurrency": "GBP", "exchangeRate": 1.17, "spotRate": 1.22, "isSettled": false
+      },
+      {
+        "voucher": "FX-2024-003", "date": "2024-05-31", "module": "Sales",
+        "account": "411", "description": "Receivable – US Customer  [MIXED: USD settled gain + CHF payable loss]",
+        "debit": 20000, "credit": 0,
+        "transactionCurrency": "USD", "exchangeRate": 0.92, "spotRate": 0.96, "isSettled": true
+      },
+      {
+        "voucher": "FX-2024-003", "date": "2024-05-31", "module": "Sales",
+        "account": "512", "description": "Bank – USD settlement receipt",
+        "debit": 0, "credit": 20000,
+        "transactionCurrency": "USD", "exchangeRate": 0.92, "spotRate": 0.96, "isSettled": true
+      },
+      {
+        "voucher": "FX-2024-003", "date": "2024-05-31", "module": "Procurement",
+        "account": "622", "description": "External Services – Swiss Vendor  [open CHF payable]",
+        "debit": 15000, "credit": 0,
+        "transactionCurrency": "CHF", "exchangeRate": 1.05, "spotRate": 1.08, "isSettled": false
+      },
+      {
+        "voucher": "FX-2024-003", "date": "2024-05-31", "module": "Procurement",
+        "account": "401", "description": "Supplier Payable – Swiss Vendor",
+        "debit": 0, "credit": 15000,
+        "transactionCurrency": "CHF", "exchangeRate": 1.05, "spotRate": 1.08, "isSettled": false
+      }
+    ],
+    "vouchers": {},
+    "stats": { "totalEntries": 8, "uniqueVouchers": 3 }
   }
 }
