@@ -216,8 +216,8 @@ function EntryTable({ title, accent, entries, accountingCurrency, onChange }) {
               <tr key={i}>
                 <td style={S.td}><input style={S.inp} value={e.account}     onChange={ev => edit(i,'account',     ev.target.value)} placeholder="e.g. 6618" /></td>
                 <td style={S.td}><input style={S.inp} value={e.description} onChange={ev => edit(i,'description', ev.target.value)} placeholder="Description" /></td>
-                <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.debit}  onChange={ev => edit(i,'debit',  ev.target.value)} placeholder="0.00" type="number" /></td>
-                <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.credit} onChange={ev => edit(i,'credit', ev.target.value)} placeholder="0.00" type="number" /></td>
+                <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.debit}  onChange={ev => edit(i,'debit',  ev.target.value)} placeholder="0.00" inputMode="decimal" /></td>
+                <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.credit} onChange={ev => edit(i,'credit', ev.target.value)} placeholder="0.00" inputMode="decimal" /></td>
                 <td style={S.td}>
                   <select
                     style={{ ...S.inp, color: isForeign ? '#f59e0b' : '#e2e8f0', padding: '4px 4px' }}
@@ -236,8 +236,7 @@ function EntryTable({ title, accent, entries, accountingCurrency, onChange }) {
                     style={{ ...S.inp, textAlign: 'right', opacity: isForeign ? 1 : 0.4 }}
                     value={e.exchangeRate ?? 1}
                     onChange={ev => edit(i, 'exchangeRate', ev.target.value)}
-                    type="number"
-                    step="0.0001"
+                    inputMode="decimal"
                     disabled={!isForeign}
                   />
                 </td>
