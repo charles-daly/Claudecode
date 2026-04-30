@@ -54,6 +54,7 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
   addAccrualSheet(wb, diagnosticResult, context);
   addDualGaapSheet(wb, diagnosticResult);
   addFinancialImpactSheet(wb, diagnosticResult);
+  addCurrencySheet(wb, diagnosticResult);
 
   await wb.xlsx.writeFile(filePath);
 }
@@ -316,6 +317,9 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
 
         heading2('11.  FINANCIAL IMPACT ANALYSIS'),
         ...financialImpactWordSection(diagnosticResult),
+
+        heading2('12.  MULTI-CURRENCY ANALYSIS'),
+        ...currencyWordSection(diagnosticResult),
 
         spacer(),
         para(
@@ -1399,6 +1403,176 @@ function financialImpactWordSection(diagnosticResult) {
       parts.push(spacer());
     });
   }
+
+  return parts;
+}
+
+// ─── Currency Analysis sheet ──────────────────────────────────────────────────
+function addCurrencySheet(wb, diagnosticResult) {
+  const va = diagnosticResult.voucherAnalysis;
+  if (!va) return;
+
+  // Collect all multi-currency vouchers across sheets
+  const rows = [];
+  Object.entries(va).forEach(([sheetName, sheetData]) => {
+    const map = sheetData.currencyAnalysisMap || {};
+    Object.values(map).forEach(ana => {
+      ana.issues.forEach(issue => {
+        rows.push({
+          sheetName,
+          voucherId:         ana.voucherId,
+          accountingCurrency:ana.accountingCurrency,
+          currencies:        ana.currencies?.join(', ') || '',
+          isMultiCurrency:   ana.isMultiCurrency ? 'Yes' : 'No',
+          acctgDr:           ana.accountingBalance?.totalDrAccounting ?? '',
+          acctgCr:           ana.accountingBalance?.totalCrAccounting ?? '',
+          balanced:          ana.accountingBalance?.balanced ? 'Yes' : 'No',
+          difference:        ana.accountingBalance?.difference ?? 0,
+          issueType:         issue.type,
+          issueSeverity:     issue.severity,
+          issueDetail:       issue.detail || issue.issue || '',
+          fix:               issue.fix || '',
+        });
+      });
+      // Vouchers with multi-currency but no issues still get a summary row
+      if (ana.issues.length === 0 && ana.isMultiCurrency) {
+        rows.push({
+          sheetName,
+          voucherId:         ana.voucherId,
+          accountingCurrency:ana.accountingCurrency,
+          currencies:        ana.currencies?.join(', ') || '',
+          isMultiCurrency:   'Yes',
+          acctgDr:           ana.accountingBalance?.totalDrAccounting ?? '',
+          acctgCr:           ana.accountingBalance?.totalCrAccounting ?? '',
+          balanced:          ana.accountingBalance?.balanced ? 'Yes' : 'No',
+          difference:        0,
+          issueType:         'CLEAN',
+          issueSeverity:     'clean',
+          issueDetail:       'No FX issues detected',
+          fix:               '',
+        });
+      }
+    });
+  });
+
+  if (rows.length === 0) return;
+
+  const ws = wb.addWorksheet('Currency Analysis');
+  ws.columns = [
+    { header: 'Sheet',          key: 'sheetName',          width: 22 },
+    { header: 'Voucher',        key: 'voucherId',          width: 18 },
+    { header: 'Acctg. Ccy',    key: 'accountingCurrency', width: 12 },
+    { header: 'Currencies',    key: 'currencies',          width: 18 },
+    { header: 'Multi-Ccy',     key: 'isMultiCurrency',     width: 10 },
+    { header: 'Acctg DR',      key: 'acctgDr',             width: 14 },
+    { header: 'Acctg CR',      key: 'acctgCr',             width: 14 },
+    { header: 'Balanced',      key: 'balanced',            width: 10 },
+    { header: 'Difference',    key: 'difference',          width: 12 },
+    { header: 'Issue Type',    key: 'issueType',           width: 22 },
+    { header: 'Severity',      key: 'issueSeverity',       width: 10 },
+    { header: 'Detail',        key: 'issueDetail',         width: 50 },
+    { header: 'Recommended Fix', key: 'fix',               width: 55 },
+  ];
+
+  // Header row
+  const hdr = ws.getRow(1);
+  hdr.font = { bold: true, color: { argb: C.white }, size: 11 };
+  hdr.fill = fill('FF4C1D95');
+  hdr.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  hdr.height = 28;
+
+  rows.forEach(r => {
+    const row = ws.addRow(r);
+    const sevColor =
+      r.issueSeverity === 'high'   ? 'FFFEE2E2' :
+      r.issueSeverity === 'medium' ? 'FFFFF7ED' :
+      r.issueSeverity === 'clean'  ? 'FFF0FFF4' : 'FFF8FAFC';
+    row.fill = fill(sevColor);
+
+    const issueCell = row.getCell('issueType');
+    issueCell.font = { bold: true, color: { argb:
+      r.issueSeverity === 'high'   ? C.red :
+      r.issueSeverity === 'medium' ? C.orange :
+      r.issueSeverity === 'clean'  ? 'FF22C55E' : 'FF64748B',
+    }};
+    row.getCell('issueDetail').alignment = { wrapText: true };
+    row.getCell('fix').alignment = { wrapText: true };
+    row.getCell('difference').numFmt = '#,##0.00';
+    row.getCell('acctgDr').numFmt   = '#,##0.00';
+    row.getCell('acctgCr').numFmt   = '#,##0.00';
+  });
+
+  ws.autoFilter = { from: 'A1', to: 'M1' };
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+// ─── Currency Word section ────────────────────────────────────────────────────
+function currencyWordSection(diagnosticResult) {
+  const va = diagnosticResult.voucherAnalysis;
+  const parts = [];
+
+  if (!va) {
+    parts.push(para('No voucher data available for multi-currency analysis.', { color: '888888', italics: true }));
+    return parts;
+  }
+
+  // Collect summary stats
+  let totalMulti = 0, totalFxIssue = 0, totalOverride = 0;
+  const allCcys = new Set();
+
+  Object.values(va).forEach(sheet => {
+    const cs = sheet.currencySummary;
+    if (!cs) return;
+    totalMulti    += cs.multiCurrencyVouchers || 0;
+    totalFxIssue  += cs.fxIssueVouchers      || 0;
+    totalOverride += cs.rateOverrideVouchers  || 0;
+    (cs.currenciesUsed || []).forEach(c => allCcys.add(c));
+  });
+
+  if (totalMulti === 0) {
+    parts.push(para('No multi-currency vouchers detected. All entries appear to be in the accounting currency.', { color: '888888', italics: true }));
+    return parts;
+  }
+
+  parts.push(new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({ children: [
+        new TableCell({ children: [para('Multi-Currency Vouchers')], shading: { fill: 'EDE9FE', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(String(totalMulti))] }),
+        new TableCell({ children: [para('FX Issue Vouchers')], shading: { fill: 'EDE9FE', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(String(totalFxIssue))] }),
+        new TableCell({ children: [para('Rate Override Vouchers')], shading: { fill: 'EDE9FE', type: ShadingType.CLEAR } }),
+        new TableCell({ children: [para(String(totalOverride))] }),
+      ]}),
+      new TableRow({ children: [
+        new TableCell({ children: [para('Currencies Used')], shading: { fill: 'EDE9FE', type: ShadingType.CLEAR } }),
+        new TableCell({ columnSpan: 5, children: [para([...allCcys].join(', '))] }),
+      ]}),
+    ],
+  }));
+  parts.push(spacer());
+
+  // Per-sheet detail
+  Object.entries(va).forEach(([sheetName, sheetData]) => {
+    const map = sheetData.currencyAnalysisMap || {};
+    const analyses = Object.values(map).filter(a => a.isMultiCurrency || a.issues.length > 0);
+    if (analyses.length === 0) return;
+
+    parts.push(para(sheetName, { bold: true, size: 24 }));
+    analyses.forEach(ana => {
+      parts.push(para(`Voucher: ${ana.voucherId}  |  Acctg. Currency: ${ana.accountingCurrency}  |  Currencies: ${ana.currencies?.join(', ')}`, { size: 20, color: '444444' }));
+      if (ana.fxDifference?.detected) {
+        parts.push(bullet(`${ana.fxDifference.type}: difference of ${ana.fxDifference.amount?.toFixed(2)} ${ana.accountingCurrency}`));
+        parts.push(bullet(`Fix: ${ana.fxDifference.fix}`));
+      }
+      ana.rateOverrides?.forEach(ro => {
+        parts.push(bullet(`RATE_OVERRIDE on ${ro.currency}: rates ${ro.rates?.join(' vs ')}`));
+        parts.push(bullet(`Fix: ${ro.fix}`));
+      });
+      parts.push(spacer());
+    });
+  });
 
   return parts;
 }

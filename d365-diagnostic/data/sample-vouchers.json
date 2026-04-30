@@ -113,5 +113,47 @@
     ],
     "vouchers": {},
     "stats": { "totalEntries": 12, "uniqueVouchers": 6 }
+  },
+  "Multi-Currency Entries": {
+    "entries": [
+      {
+        "voucher": "MC-2024-001", "date": "2024-04-01",
+        "account": "411", "description": "Customer Receivable – US Client (USD invoice)",
+        "debit": 36000, "credit": 0,
+        "transactionCurrency": "USD", "exchangeRate": 0.92, "module": "Sales"
+      },
+      {
+        "voucher": "MC-2024-001", "date": "2024-04-01",
+        "account": "701", "description": "Product Sales Revenue (USD invoice)",
+        "debit": 0, "credit": 36000,
+        "transactionCurrency": "USD", "exchangeRate": 0.92, "module": "Sales"
+      },
+      {
+        "voucher": "MC-2024-002", "date": "2024-04-15",
+        "account": "622", "description": "External Services – USD Supplier (EUR line)",
+        "debit": 15000, "credit": 0,
+        "transactionCurrency": "EUR", "exchangeRate": 1.00, "module": "Procurement"
+      },
+      {
+        "voucher": "MC-2024-002", "date": "2024-04-15",
+        "account": "401", "description": "Supplier Payable (USD at 0.90 – FX imbalance)",
+        "debit": 0, "credit": 16500,
+        "transactionCurrency": "USD", "exchangeRate": 0.90, "module": "Procurement"
+      },
+      {
+        "voucher": "MC-2024-003", "date": "2024-04-30",
+        "account": "401", "description": "Supplier Payable Settlement (USD @ 0.94 – rate override DR)",
+        "debit": 20000, "credit": 0,
+        "transactionCurrency": "USD", "exchangeRate": 0.94, "module": "Procurement"
+      },
+      {
+        "voucher": "MC-2024-003", "date": "2024-04-30",
+        "account": "512", "description": "Bank Payment (USD @ 0.91 – rate override CR)",
+        "debit": 0, "credit": 20000,
+        "transactionCurrency": "USD", "exchangeRate": 0.91, "module": "Procurement"
+      }
+    ],
+    "vouchers": {},
+    "stats": { "totalEntries": 6, "uniqueVouchers": 3 }
   }
 }

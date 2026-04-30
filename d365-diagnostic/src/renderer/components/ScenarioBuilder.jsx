@@ -45,20 +45,24 @@ const TX_TYPES = {
   ],
 };
 
-const BLANK_ENTRY    = { account: '', description: '', debit: '', credit: '' };
-const BLANK_SCENARIO = (n, module) => ({
-  id:              Date.now(),
-  description:     `Scenario ${n}`,
-  transactionType: TX_TYPES[module]?.[0]?.value || '',
-  expectedEntries: [{ ...BLANK_ENTRY }],
-  actualEntries:   [{ ...BLANK_ENTRY }],
+const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'JPY', 'CNY', 'CAD', 'AUD', 'SEK', 'NOK', 'DKK', 'SGD', 'HKD', 'INR', 'BRL', 'MXN', 'PLN', 'CZK', 'HUF', 'RON'];
+
+const BLANK_ENTRY    = { account: '', description: '', debit: '', credit: '', currency: 'EUR', exchangeRate: 1 };
+const BLANK_SCENARIO = (n, module, accountingCurrency = 'EUR') => ({
+  id:                Date.now(),
+  description:       `Scenario ${n}`,
+  transactionType:   TX_TYPES[module]?.[0]?.value || '',
+  accountingCurrency,
+  expectedEntries:   [{ ...BLANK_ENTRY, currency: accountingCurrency }],
+  actualEntries:     [{ ...BLANK_ENTRY, currency: accountingCurrency }],
 });
 
 export default function ScenarioBuilder({ scenarios, setScenarios, context }) {
   const [open, setOpen] = useState(null);
+  const accountingCurrency = (context.accountingCurrency || 'EUR').toUpperCase();
 
   const add = () => {
-    const s = BLANK_SCENARIO(scenarios.length + 1, context.module);
+    const s = BLANK_SCENARIO(scenarios.length + 1, context.module, accountingCurrency);
     setScenarios(p => [...p, s]);
     setOpen(s.id);
   };
@@ -106,6 +110,14 @@ export default function ScenarioBuilder({ scenarios, setScenarios, context }) {
             >
               {txTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
+            {/* Accounting currency badge */}
+            <span
+              style={S.acctCcyBadge}
+              title="Accounting currency for this scenario"
+              onClick={e => e.stopPropagation()}
+            >
+              {s.accountingCurrency || accountingCurrency}
+            </span>
             <button style={S.removeBtn} onClick={e => { e.stopPropagation(); remove(s.id); }}>✕</button>
             <span style={{ color: '#475569', fontSize: 12 }}>{open === s.id ? '▲' : '▼'}</span>
           </div>
@@ -117,12 +129,14 @@ export default function ScenarioBuilder({ scenarios, setScenarios, context }) {
                   title="Expected Entries"
                   accent="#22c55e"
                   entries={s.expectedEntries}
+                  accountingCurrency={s.accountingCurrency || accountingCurrency}
                   onChange={v => update(s.id, 'expectedEntries', v)}
                 />
                 <EntryTable
                   title="Actual Entries (Posted)"
                   accent="#3b82f6"
                   entries={s.actualEntries}
+                  accountingCurrency={s.accountingCurrency || accountingCurrency}
                   onChange={v => update(s.id, 'actualEntries', v)}
                 />
               </div>
@@ -134,22 +148,51 @@ export default function ScenarioBuilder({ scenarios, setScenarios, context }) {
   );
 }
 
-function EntryTable({ title, accent, entries, onChange }) {
-  const add    = ()        => onChange([...entries, { ...BLANK_ENTRY }]);
+function acctgAmt(entry, accountingCurrency) {
+  const ccy  = (entry.currency || accountingCurrency).toUpperCase();
+  const rate  = parseFloat(entry.exchangeRate) || 1;
+  const dr    = parseFloat(entry.debit)  || 0;
+  const cr    = parseFloat(entry.credit) || 0;
+  const amt   = dr || cr;
+  return ccy !== accountingCurrency ? parseFloat((amt * rate).toFixed(2)) : amt;
+}
+
+function EntryTable({ title, accent, entries, accountingCurrency, onChange }) {
+  const add    = ()        => onChange([...entries, { ...BLANK_ENTRY, currency: accountingCurrency }]);
   const remove = (i)       => onChange(entries.filter((_, j) => j !== i));
   const edit   = (i, k, v) => onChange(entries.map((e, j) => j === i ? { ...e, [k]: v } : e));
 
+  // TX balance (in transaction currency — only valid when all same ccy)
   const drTotal  = entries.reduce((s, e) => s + (parseFloat(e.debit)  || 0), 0);
   const crTotal  = entries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0);
   const balanced = Math.abs(drTotal - crTotal) < 0.01;
+
+  // Accounting balance
+  const acctDr = entries.reduce((s, e) => {
+    if ((parseFloat(e.debit) || 0) > 0) return s + acctgAmt(e, accountingCurrency);
+    return s;
+  }, 0);
+  const acctCr = entries.reduce((s, e) => {
+    if ((parseFloat(e.credit) || 0) > 0) return s + acctgAmt(e, accountingCurrency);
+    return s;
+  }, 0);
+  const acctBalanced = Math.abs(acctDr - acctCr) < 0.01;
+  const isMultiCcy   = entries.some(e => (e.currency || accountingCurrency).toUpperCase() !== accountingCurrency);
 
   return (
     <div style={S.entryBox}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: 'uppercase', letterSpacing: .8 }}>{title}</span>
-        <span style={{ fontSize: 11, color: balanced ? '#22c55e' : '#ef4444' }}>
-          {balanced ? '✓ Balanced' : `Diff: ${Math.abs(drTotal - crTotal).toFixed(2)}`}
-        </span>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: balanced ? '#22c55e' : '#ef4444' }}>
+            TX: {balanced ? '✓' : `Δ ${Math.abs(drTotal - crTotal).toFixed(2)}`}
+          </span>
+          {isMultiCcy && (
+            <span style={{ fontSize: 11, color: acctBalanced ? '#a78bfa' : '#ef4444' }}>
+              {accountingCurrency}: {acctBalanced ? '✓' : `Δ ${Math.abs(acctDr - acctCr).toFixed(2)}`}
+            </span>
+          )}
+        </div>
       </div>
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
@@ -159,19 +202,52 @@ function EntryTable({ title, accent, entries, onChange }) {
             <th style={S.th}>Description</th>
             <th style={{ ...S.th, textAlign: 'right' }}>Debit</th>
             <th style={{ ...S.th, textAlign: 'right' }}>Credit</th>
+            <th style={S.th}>Ccy</th>
+            <th style={{ ...S.th, textAlign: 'right' }}>Rate</th>
+            <th style={{ ...S.th, textAlign: 'right', color: '#a78bfa' }}>Acctg</th>
             <th style={S.th}></th>
           </tr>
         </thead>
         <tbody>
-          {entries.map((e, i) => (
-            <tr key={i}>
-              <td style={S.td}><input style={S.inp} value={e.account}     onChange={ev => edit(i,'account',     ev.target.value)} placeholder="e.g. 6618" /></td>
-              <td style={S.td}><input style={S.inp} value={e.description} onChange={ev => edit(i,'description', ev.target.value)} placeholder="Description" /></td>
-              <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.debit}  onChange={ev => edit(i,'debit',  ev.target.value)} placeholder="0.00" type="number" /></td>
-              <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.credit} onChange={ev => edit(i,'credit', ev.target.value)} placeholder="0.00" type="number" /></td>
-              <td style={S.td}><button style={S.delRow} onClick={() => remove(i)}>✕</button></td>
-            </tr>
-          ))}
+          {entries.map((e, i) => {
+            const isForeign = (e.currency || accountingCurrency).toUpperCase() !== accountingCurrency;
+            const amt = acctgAmt(e, accountingCurrency);
+            return (
+              <tr key={i}>
+                <td style={S.td}><input style={S.inp} value={e.account}     onChange={ev => edit(i,'account',     ev.target.value)} placeholder="e.g. 6618" /></td>
+                <td style={S.td}><input style={S.inp} value={e.description} onChange={ev => edit(i,'description', ev.target.value)} placeholder="Description" /></td>
+                <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.debit}  onChange={ev => edit(i,'debit',  ev.target.value)} placeholder="0.00" type="number" /></td>
+                <td style={S.td}><input style={{ ...S.inp, textAlign: 'right' }} value={e.credit} onChange={ev => edit(i,'credit', ev.target.value)} placeholder="0.00" type="number" /></td>
+                <td style={S.td}>
+                  <select
+                    style={{ ...S.inp, color: isForeign ? '#f59e0b' : '#e2e8f0', padding: '4px 4px' }}
+                    value={e.currency || accountingCurrency}
+                    onChange={ev => {
+                      const ccy = ev.target.value;
+                      edit(i, 'currency', ccy);
+                      if (ccy === accountingCurrency) edit(i, 'exchangeRate', 1);
+                    }}
+                  >
+                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </td>
+                <td style={S.td}>
+                  <input
+                    style={{ ...S.inp, textAlign: 'right', opacity: isForeign ? 1 : 0.4 }}
+                    value={e.exchangeRate ?? 1}
+                    onChange={ev => edit(i, 'exchangeRate', ev.target.value)}
+                    type="number"
+                    step="0.0001"
+                    disabled={!isForeign}
+                  />
+                </td>
+                <td style={{ ...S.td, fontFamily: 'monospace', textAlign: 'right', color: '#a78bfa', fontSize: 11, paddingTop: 8, paddingRight: 4 }}>
+                  {isForeign && amt > 0 ? amt.toFixed(2) : '—'}
+                </td>
+                <td style={S.td}><button style={S.delRow} onClick={() => remove(i)}>✕</button></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <button style={{ ...S.addRowBtn, borderColor: accent, color: accent }} onClick={add}>+ Add Line</button>
@@ -219,11 +295,16 @@ const S = {
     background: '#0f172a', border: '1px solid #334155', color: '#94a3b8',
     padding: '4px 8px', borderRadius: 6, fontSize: 12, outline: 'none',
   },
+  acctCcyBadge: {
+    background: '#1e293b', border: '1px solid #334155', borderRadius: 4,
+    padding: '3px 8px', fontSize: 11, fontWeight: 700, color: '#a78bfa', letterSpacing: 0.5,
+    flexShrink: 0,
+  },
   removeBtn: { background: 'none', border: 'none', color: '#475569', fontSize: 14, cursor: 'pointer', padding: '0 4px' },
   cardBody: { padding: '0 16px 16px', borderTop: '1px solid #1e293b' },
   cols: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 },
   entryBox: { background: '#0f1117', border: '1px solid #1e293b', borderRadius: 8, padding: '12px' },
-  th: { padding: '6px 6px 6px 0', textAlign: 'left', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: .5, borderBottom: '1px solid #1e293b' },
+  th: { padding: '6px 4px 6px 0', textAlign: 'left', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: .5, borderBottom: '1px solid #1e293b' },
   td: { padding: '4px 4px 0 0', verticalAlign: 'top' },
   inp: { width: '100%', background: '#1a1f2e', border: '1px solid #1e293b', borderRadius: 4, color: '#e2e8f0', padding: '5px 7px', fontSize: 12, outline: 'none' },
   delRow: { background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: '5px 4px', fontSize: 13 },

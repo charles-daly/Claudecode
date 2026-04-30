@@ -57,6 +57,33 @@ export default function ContextSelector({ context, setContext }) {
           <Radio name="gaap" value="dual_gaap"   label="Dual GAAP"   sub="French statutory + IFRS reporting layer"  current={context.gaap} onChange={v => set('gaap', v)} />
         </FieldCard>
 
+        {/* Accounting Currency */}
+        <FieldCard title="Accounting Currency" icon="💱">
+          <p style={S.featureDesc}>
+            The ledger currency in which DR = CR must hold after FX conversion.
+            Defaults to EUR. Foreign-currency lines are converted at their exchange rate.
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['EUR', 'USD', 'GBP', 'CHF', 'JPY'].map(ccy => {
+              const active = (context.accountingCurrency || 'EUR') === ccy;
+              return (
+                <button
+                  key={ccy}
+                  onClick={() => set('accountingCurrency', ccy)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', border: active ? '2px solid #a78bfa' : '1px solid #334155',
+                    background: active ? '#1e1533' : '#0f172a', color: active ? '#a78bfa' : '#64748b',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {ccy}
+                </button>
+              );
+            })}
+          </div>
+        </FieldCard>
+
         {/* PMA Toggle */}
         <FieldCard title="PMA — Provision pour Mise en Amortissement" icon="🇫🇷" span={2}>
           <p style={S.featureDesc}>
@@ -120,6 +147,7 @@ export default function ContextSelector({ context, setContext }) {
             ['Module',   activeModule.label],
             ['Country',  context.country],
             ['GAAP',     context.gaap?.replace(/_/g, ' ')?.replace(/\b\w/g, c => c.toUpperCase())],
+            ['Acctg. Ccy', context.accountingCurrency || 'EUR'],
             ['PMA',      context.pma ? 'Enabled' : 'Disabled'],
             ...(context.module === 'pma' ? [
               ['Accrual', pg.accrualEnabled ? 'Enabled' : 'Disabled'],

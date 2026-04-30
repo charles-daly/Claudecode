@@ -7,6 +7,7 @@ const { moduleLoader } = require('./moduleLoader');
 const { analyseAccrualScenario } = require('./accrualEngine');
 const { validateDualGaap } = require('./gaapValidationEngine');
 const { runFinancialImpact } = require('./financialImpactEngine');
+const { runCurrencyAnalysis, analyseVoucherCurrency } = require('./currencyEngine');
 
 /**
  * Master diagnostic runner.
@@ -259,6 +260,60 @@ function analyseVoucherData(voucherData, context) {
       });
     }
 
+    // ── Currency analysis ─────────────────────────────────────────────────────
+    const accountingCurrency = (context.accountingCurrency || 'EUR').toUpperCase();
+    const currencyAnalysisMap = {};
+
+    voucherResults.forEach(vResult => {
+      // Build a temporary voucher object with entries the currency engine expects
+      const rawEntries = (vResult.entries || []).map(e => ({
+        ...e,
+        transactionCurrency: e.transactionCurrency || e.currency || accountingCurrency,
+        exchangeRate:        e.exchangeRate        != null ? e.exchangeRate : 1,
+      }));
+      const tempVoucher = { voucherId: vResult.voucherId, entries: rawEntries };
+      const currAna = analyseVoucherCurrency(tempVoucher, accountingCurrency);
+
+      if (currAna.isMultiCurrency || currAna.issues.length > 0) {
+        currencyAnalysisMap[vResult.voucherId] = currAna;
+        vResult.currencyAnalysis = currAna;
+
+        currAna.issues.forEach(ci => {
+          const alreadyFx = vResult.issues.some(i => i.type === ci.type);
+          if (!alreadyFx) {
+            vResult.issues.push({
+              type:     ci.type,
+              severity: ci.severity === 'high' ? 'high' : ci.severity === 'medium' ? 'medium' : 'low',
+              title:    ci.type === 'FX_ROUNDING'         ? 'FX Rounding Difference'
+                      : ci.type === 'FX_IMBALANCE'        ? 'Accounting Currency Imbalance (FX)'
+                      : ci.type === 'MISSING_FX_POSTING'  ? 'Missing FX Gain/Loss Posting'
+                      : ci.type === 'RATE_OVERRIDE'        ? `Exchange Rate Override — ${ci.currency || ''}`
+                      : ci.type,
+              detail:   ci.detail   || ci.issue || '',
+              fix:      ci.fix      || '',
+              rootCause: ci.rootCause || null,
+              actualSource:     null,
+              expectedSource:   null,
+              sourceComparison: null,
+              universalModel:   uam(context, null, null, null, null, null),
+            });
+          }
+        });
+
+        if (vResult.issues.some(i => i.severity === 'high') && vResult.severity !== 'critical') vResult.severity = 'high';
+        if (vResult.issues.length > 0) vResult.status = 'issues';
+      }
+    });
+
+    const multiCurrencyVouchers = voucherResults.filter(v => v.currencyAnalysis?.isMultiCurrency);
+    const currencySummary = {
+      accountingCurrency,
+      multiCurrencyVouchers: multiCurrencyVouchers.length,
+      fxIssueVouchers:       voucherResults.filter(v => v.currencyAnalysis?.fxDifference?.detected).length,
+      rateOverrideVouchers:  voucherResults.filter(v => (v.currencyAnalysis?.rateOverrides?.length || 0) > 0).length,
+      currenciesUsed:        [...new Set(voucherResults.flatMap(v => v.currencyAnalysis?.currencies || []))],
+    };
+
     sheetResults[sheetName] = {
       totalVouchers:    voucherResults.length,
       cleanVouchers:    voucherResults.filter(v => v.status === 'clean').length,
@@ -268,6 +323,8 @@ function analyseVoucherData(voucherData, context) {
       issueCategories:  categoriseIssues(voucherResults),
       stats:            sheetData.stats,
       gaapValidation,
+      currencyAnalysisMap,
+      currencySummary,
     };
   });
 
@@ -427,6 +484,21 @@ function buildSummary(results) {
         dg.conflicting > 0 || dg.incorrect > 0 ? 'error'   :
         dg.missing     > 0                      ? 'warning' : 'clean';
       summary.dualGaap = dg;
+    }
+
+    // ── Currency aggregate ────────────────────────────────────────────────────
+    const cx = { multiCurrencyVouchers: 0, fxIssueVouchers: 0, rateOverrideVouchers: 0, currenciesUsed: new Set() };
+    Object.values(results.voucherAnalysis).forEach(sheet => {
+      const cs = sheet.currencySummary;
+      if (!cs) return;
+      cx.multiCurrencyVouchers += cs.multiCurrencyVouchers;
+      cx.fxIssueVouchers       += cs.fxIssueVouchers;
+      cx.rateOverrideVouchers  += cs.rateOverrideVouchers;
+      (cs.currenciesUsed || []).forEach(c => cx.currenciesUsed.add(c));
+    });
+    cx.currenciesUsed = [...cx.currenciesUsed];
+    if (cx.multiCurrencyVouchers > 0 || cx.currenciesUsed.length > 0) {
+      summary.currency = cx;
     }
   }
 

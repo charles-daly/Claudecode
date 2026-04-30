@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "description": "Reference exchange rates to EUR (base). Used as fallback when no rate is supplied in import data. Rates are illustrative — always supply accurate rates in your import file.",
+    "base": "EUR",
+    "updated": "2026-04-30"
+  },
+  "rates": {
+    "EUR": 1.0000,
+    "USD": 0.9200,
+    "GBP": 1.1700,
+    "CHF": 1.0500,
+    "JPY": 0.0062,
+    "CNY": 0.1270,
+    "CAD": 0.6800,
+    "AUD": 0.6100,
+    "SEK": 0.0870,
+    "NOK": 0.0870,
+    "DKK": 0.1340,
+    "SGD": 0.6900,
+    "HKD": 0.1180,
+    "INR": 0.0110,
+    "BRL": 0.1830,
+    "MXN": 0.0530,
+    "PLN": 0.2300,
+    "CZK": 0.0390,
+    "HUF": 0.0025,
+    "RON": 0.2010
+  },
+  "fxAccounts": {
+    "gain": { "fr": "766", "us": "760000", "description": "Foreign exchange gain" },
+    "loss": { "fr": "666", "us": "860000", "description": "Foreign exchange loss" },
+    "rounding": { "fr": "6568", "us": "799000", "description": "FX rounding differences" }
+  }
+}

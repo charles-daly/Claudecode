@@ -13,6 +13,7 @@ import FinancialImpact from './components/FinancialImpact';
 const DEFAULT_CONTEXT = {
   module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false,
   projectGroup: { accrualEnabled: false, autoReverse: false },
+  accountingCurrency: 'EUR',
 };
 
 // ─── Built-in sample scenarios ────────────────────────────────────────────────
