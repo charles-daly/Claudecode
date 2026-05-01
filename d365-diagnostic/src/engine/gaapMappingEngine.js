@@ -76,14 +76,27 @@ function getMapping(usAccount) {
 }
 
 /**
- * Finds a mapping by either US or French account number.
+ * Finds a mapping by either US, French, or Belgian account number.
  * @param {string} account
  * @returns {Object|undefined}
  */
 function getMappingByAccount(account) {
   if (!account) return undefined;
   const needle = String(account).trim();
-  return getAllMappings().find(m => m.usAccount === needle || m.frAccount === needle);
+  return getAllMappings().find(m =>
+    m.usAccount === needle || m.frAccount === needle || m.beAccount === needle
+  );
+}
+
+/**
+ * Finds a mapping by Belgian PCMN account number.
+ * @param {string} beAccount
+ * @returns {Object|undefined}
+ */
+function getMappingByBeAccount(beAccount) {
+  if (!beAccount) return undefined;
+  const needle = String(beAccount).trim();
+  return getAllMappings().find(m => m.beAccount === needle);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,13 +107,14 @@ const REQUIRED_FIELDS = ['usAccount', 'frAccount', 'type'];
 
 /**
  * Validates a mapping candidate against business rules.
- * @param {Object}  candidate  The mapping to validate.
- * @param {Array}   existing   Current mappings array (used for duplicate checks).
+ * @param {Object}  candidate   The mapping to validate.
+ * @param {Array}   existing    Current mappings array (used for duplicate checks).
  * @param {string}  [excludeId] When updating, the id of the mapping being replaced.
- * @returns {{ valid: boolean, errors: string[] }}
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
  */
 function _validate(candidate, existing, excludeId) {
-  const errors = [];
+  const errors   = [];
+  const warnings = [];
 
   // Required fields
   for (const field of REQUIRED_FIELDS) {
@@ -110,11 +124,12 @@ function _validate(candidate, existing, excludeId) {
   }
 
   if (errors.length > 0) {
-    return { valid: false, errors };
+    return { valid: false, errors, warnings };
   }
 
   const usAccount = String(candidate.usAccount).trim();
   const frAccount = String(candidate.frAccount).trim();
+  const beAccount = candidate.beAccount ? String(candidate.beAccount).trim() : '';
   const type      = String(candidate.type).trim();
 
   const others = excludeId
@@ -135,7 +150,17 @@ function _validate(candidate, existing, excludeId) {
     );
   }
 
-  return { valid: errors.length === 0, errors };
+  // Warning: same beAccount mapped from a different usAccount (soft conflict)
+  if (beAccount) {
+    const beConflict = others.find(m => m.beAccount && m.beAccount === beAccount);
+    if (beConflict) {
+      warnings.push(
+        `Belgian account "${beAccount}" is already mapped from US account "${beConflict.usAccount}" (id: ${beConflict.id}). Verify this is intentional.`
+      );
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 /**
@@ -175,6 +200,7 @@ function addMapping(mapping) {
     id:          _generateId(mappings),
     usAccount:   String(mapping.usAccount).trim(),
     frAccount:   String(mapping.frAccount).trim(),
+    beAccount:   mapping.beAccount ? String(mapping.beAccount).trim() : '',
     type:        String(mapping.type).trim(),
     description: mapping.description ? String(mapping.description).trim() : '',
     module:      mapping.module ? String(mapping.module).trim() : '',
@@ -184,7 +210,7 @@ function addMapping(mapping) {
   data.mappings = mappings;
   _writeFile(data);
 
-  return { success: true, mapping: newMapping };
+  return { success: true, mapping: newMapping, warnings: validation.warnings };
 }
 
 /**
@@ -209,11 +235,16 @@ function updateMapping(id, updates) {
     return { success: false, errors };
   }
 
-  mappings[index] = merged;
+  mappings[index] = {
+    ...merged,
+    beAccount: updates.beAccount !== undefined
+      ? (updates.beAccount ? String(updates.beAccount).trim() : '')
+      : (mappings[index].beAccount || ''),
+  };
   data.mappings   = mappings;
   _writeFile(data);
 
-  return { success: true, mapping: merged };
+  return { success: true, mapping: mappings[index], warnings: validation.warnings };
 }
 
 /**
@@ -261,8 +292,8 @@ function saveMappingsRaw(mappings) {
  * Applies a mapping in a given translation direction.
  *
  * @param {string} account      The account number to look up.
- * @param {string} sourceGaap   'us_gaap' | 'french_gaap'
- * @param {string} targetGaap   'french_gaap' | 'us_gaap'
+ * @param {string} sourceGaap   'us_gaap' | 'french_gaap' | 'belgium_gaap'
+ * @param {string} targetGaap   'us_gaap' | 'french_gaap' | 'belgium_gaap'
  * @returns {{ found: boolean, mappedAccount: string|null, mapping: Object|null }}
  */
 function applyMapping(account, sourceGaap, targetGaap) {
@@ -278,9 +309,13 @@ function applyMapping(account, sourceGaap, targetGaap) {
     mapping = all.find(m => m.usAccount === needle) || null;
   } else if (sourceGaap === 'french_gaap') {
     mapping = all.find(m => m.frAccount === needle) || null;
+  } else if (sourceGaap === 'belgium_gaap') {
+    mapping = all.find(m => m.beAccount === needle) || null;
   } else {
-    // Unknown source — try both
-    mapping = all.find(m => m.usAccount === needle || m.frAccount === needle) || null;
+    // Unknown source — try all three
+    mapping = all.find(m =>
+      m.usAccount === needle || m.frAccount === needle || m.beAccount === needle
+    ) || null;
   }
 
   if (!mapping) {
@@ -289,9 +324,11 @@ function applyMapping(account, sourceGaap, targetGaap) {
 
   let mappedAccount = null;
   if (targetGaap === 'french_gaap') {
-    mappedAccount = mapping.frAccount;
+    mappedAccount = mapping.frAccount || null;
   } else if (targetGaap === 'us_gaap') {
-    mappedAccount = mapping.usAccount;
+    mappedAccount = mapping.usAccount || null;
+  } else if (targetGaap === 'belgium_gaap') {
+    mappedAccount = mapping.beAccount || null;
   }
 
   return { found: true, mappedAccount, mapping };
@@ -319,12 +356,15 @@ function analyseAccountMapping(account, expectedAccount, context) {
   const mappingByFR = all.find(m => m.frAccount === needle);
   const mapping     = mappingByUS || mappingByFR || null;
 
-  if (!mapping) {
+  const mappingByBE = all.find(m => m.beAccount && m.beAccount === needle) || null;
+
+  if (!mapping && !mappingByBE) {
     return {
       account,
       mappingFound:  false,
       usAccount:     null,
       frAccount:     null,
+      beAccount:     null,
       counterpart:   null,
       isUSAccount:   null,
       gaapSide:      'unknown',
@@ -337,42 +377,40 @@ function analyseAccountMapping(account, expectedAccount, context) {
     };
   }
 
-  const isUSAccount = Boolean(mappingByUS);
-  const gaapSide    = isUSAccount ? 'us_gaap' : 'french_gaap';
-  const counterpart = isUSAccount ? mapping.frAccount : mapping.usAccount;
+  const resolvedMapping = mapping || mappingByBE;
+  const isUSAccount  = Boolean(mappingByUS);
+  const isBEAccount  = !mappingByUS && !mappingByFR && Boolean(mappingByBE);
+  const gaapSide     = isUSAccount ? 'us_gaap' : isBEAccount ? 'belgium_gaap' : 'french_gaap';
+  const counterpart  = isUSAccount ? resolvedMapping.frAccount : resolvedMapping.usAccount;
 
-  // A mismatch occurs when the account is on the wrong GAAP side for the
-  // expected context (e.g. a French PCG account appearing in a US-GAAP context).
   const gaapMismatch =
     ctxGaap !== 'unknown' && gaapSide !== 'unknown' && gaapSide !== ctxGaap;
 
-  // Determine mapping status
   let mappingStatus;
   if (!expectedAccount) {
-    // No expectation provided — consider found = correct
     mappingStatus = gaapMismatch ? 'incorrect' : 'correct';
   } else {
     const exp = String(expectedAccount).trim();
-    if (needle === exp) {
-      mappingStatus = gaapMismatch ? 'incorrect' : 'correct';
-    } else {
-      mappingStatus = 'incorrect';
-    }
+    mappingStatus = needle === exp
+      ? (gaapMismatch ? 'incorrect' : 'correct')
+      : 'incorrect';
   }
 
   return {
     account,
     mappingFound:  true,
-    usAccount:     mapping.usAccount,
-    frAccount:     mapping.frAccount,
+    usAccount:     resolvedMapping.usAccount,
+    frAccount:     resolvedMapping.frAccount,
+    beAccount:     resolvedMapping.beAccount || null,
     counterpart,
     isUSAccount,
+    isBEAccount,
     gaapSide,
     gaapMismatch,
     mappingStatus,
-    description:   mapping.description || null,
-    type:          mapping.type || null,
-    module:        mapping.module || null,
+    description:   resolvedMapping.description || null,
+    type:          resolvedMapping.type || null,
+    module:        resolvedMapping.module || null,
     expected:      expectedAccount,
   };
 }
@@ -386,6 +424,7 @@ module.exports = {
   getAllMappingsWithMeta,
   getMapping,
   getMappingByAccount,
+  getMappingByBeAccount,
   addMapping,
   updateMapping,
   deleteMapping,

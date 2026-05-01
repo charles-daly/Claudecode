@@ -14,4 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gaapAdd:              (mapping)       => ipcRenderer.invoke('gaap:add', mapping),
   gaapUpdate:           (id, updates)   => ipcRenderer.invoke('gaap:update', id, updates),
   gaapDelete:           (id)            => ipcRenderer.invoke('gaap:delete', id),
+  gaapImportPreview:    ()              => ipcRenderer.invoke('gaap:importPreview'),
+  gaapImportApply:      (rows, opts)    => ipcRenderer.invoke('gaap:importApply', rows, opts),
+  gaapExportMappings:   ()              => ipcRenderer.invoke('gaap:exportMappings'),
 });

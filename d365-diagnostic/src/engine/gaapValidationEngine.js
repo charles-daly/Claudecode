@@ -29,6 +29,18 @@ function classifyFrAccount(acc) {
   return 'unknown';
 }
 
+// Belgian PCMN: same class structure as French PCG
+// classes 6/7 = P&L; classes 1-5 = BS; class 8 = off-balance
+function classifyBeAccount(acc) {
+  const s = String(acc || '').replace(/\s/g, '');
+  if (!s) return 'unknown';
+  const first = parseInt(s.charAt(0), 10);
+  if (first === 6 || first === 7) return 'P&L';
+  if (first >= 1 && first <= 5)   return 'BS';
+  if (first === 8)                 return 'Off-balance';
+  return 'unknown';
+}
+
 // US GAAP: simplified numeric ranges
 //   1xxx–3xxx = Assets/Liabilities/Equity (BS)
 //   4xxx–8xxx = Revenue/Expenses (P&L)
@@ -52,10 +64,11 @@ function classifyUsAccount(acc) {
  *   {
  *     mappingStatus: 'correct'|'incorrect'|'missing'|'missing_us'|'missing_fr',
  *     mappingFound:  boolean,
- *     usAccount, frAccount, expectedFrAccount,
+ *     usAccount, frAccount, beAccount, expectedFrAccount, expectedBeAccount,
  *     mappedType, mappedDescription, mappedModule,
- *     frClassification, usClassification,
+ *     frClassification, usClassification, beClassification,
  *     gaapMismatch, classificationMismatch,
+ *     beMismatch, beStatus: 'correct'|'incorrect'|'missing'|null,
  *     rootCause: null|'MAPPING_ISSUE'|'CONFIG_ISSUE'|'MANUAL_OVERRIDE',
  *     issue:  null|string,
  *     fix:    null|string,
@@ -64,6 +77,7 @@ function classifyUsAccount(acc) {
 function _analyseEntry(entry, mappings) {
   const usAccount = String(entry.usAccount || entry.account || '').trim();
   const frAccount = String(entry.frAccount || '').trim();
+  const beAccount = String(entry.beAccount || '').trim();
 
   // ── 1. Basic presence ──────────────────────────────────────────────────────
   if (!usAccount) {
@@ -72,12 +86,14 @@ function _analyseEntry(entry, mappings) {
       gaapAnalysis: {
         mappingStatus: 'missing_us',
         mappingFound:  false,
-        usAccount, frAccount,
-        expectedFrAccount: null,
+        usAccount, frAccount, beAccount,
+        expectedFrAccount: null, expectedBeAccount: null,
         frClassification:  frAccount ? classifyFrAccount(frAccount) : 'unknown',
+        beClassification:  beAccount ? classifyBeAccount(beAccount) : 'unknown',
         usClassification:  'unknown',
         gaapMismatch:      false,
         classificationMismatch: false,
+        beMismatch: false, beStatus: null,
         rootCause: 'CONFIG_ISSUE',
         issue: 'US GAAP account is missing for this entry.',
         fix:   'Populate the US_Account column with the appropriate US GAAP account number.',
@@ -91,12 +107,14 @@ function _analyseEntry(entry, mappings) {
       gaapAnalysis: {
         mappingStatus: 'missing_fr',
         mappingFound:  false,
-        usAccount, frAccount,
-        expectedFrAccount: null,
+        usAccount, frAccount, beAccount,
+        expectedFrAccount: null, expectedBeAccount: null,
         frClassification:  'unknown',
+        beClassification:  beAccount ? classifyBeAccount(beAccount) : 'unknown',
         usClassification:  classifyUsAccount(usAccount),
         gaapMismatch:      false,
         classificationMismatch: false,
+        beMismatch: false, beStatus: null,
         rootCause: 'CONFIG_ISSUE',
         issue: 'French PCG account is missing for this entry.',
         fix:   'Populate the FR_Account column with the appropriate French PCG account number.',
@@ -117,18 +135,20 @@ function _analyseEntry(entry, mappings) {
       gaapAnalysis: {
         mappingStatus:     'missing',
         mappingFound:      false,
-        usAccount, frAccount,
-        expectedFrAccount: null,
+        usAccount, frAccount, beAccount,
+        expectedFrAccount: null, expectedBeAccount: null,
         mappedType:        null,
         mappedDescription: null,
         mappedModule:      null,
         frClassification:  frClass,
+        beClassification:  beAccount ? classifyBeAccount(beAccount) : 'unknown',
         usClassification:  usClass,
         gaapMismatch:      false,
         classificationMismatch: false,
+        beMismatch: false, beStatus: null,
         rootCause: 'MAPPING_ISSUE',
         issue: `No mapping is defined for US account ${usAccount}. Cross-GAAP traceability is unavailable.`,
-        fix:   `Add a US↔FR mapping for account ${usAccount} in Configuration → GAAP Mapping.`,
+        fix:   `Add a US↔FR↔BE mapping for account ${usAccount} in Configuration → GAAP Mapping.`,
       },
     };
   }
@@ -139,25 +159,49 @@ function _analyseEntry(entry, mappings) {
   const expFrClass          = classifyFrAccount(expectedFrAccount);
   const classificationMatch = frClass === expFrClass;
 
+  // ── 4. Belgium PCMN cross-check (optional — only when entry has beAccount) ──
+  const expectedBeAccount = mapping.beAccount || null;
+  const beClass           = beAccount ? classifyBeAccount(beAccount) : 'unknown';
+  const expBeClass        = expectedBeAccount ? classifyBeAccount(expectedBeAccount) : 'unknown';
+  let   beMismatch        = false;
+  let   beStatus          = null;
+
+  if (beAccount && expectedBeAccount) {
+    beMismatch = beAccount !== expectedBeAccount;
+    beStatus   = beMismatch ? 'incorrect' : 'correct';
+  } else if (!beAccount && expectedBeAccount) {
+    beStatus = 'missing';
+  } else if (beAccount && !expectedBeAccount) {
+    beStatus = 'unmapped';
+  }
+
   if (frMatches) {
     return {
       ...entry,
       gaapAnalysis: {
         mappingStatus:          'correct',
         mappingFound:           true,
-        usAccount, frAccount,
-        expectedFrAccount,
+        usAccount, frAccount, beAccount,
+        expectedFrAccount, expectedBeAccount,
         mappedType:             mapping.type        || null,
         mappedDescription:      mapping.description || null,
         mappedModule:           mapping.module      || null,
         frClassification:       frClass,
         expFrClassification:    expFrClass,
+        beClassification:       beClass,
+        expBeClassification:    expBeClass,
         usClassification:       usClass,
         gaapMismatch:           false,
         classificationMismatch: false,
-        rootCause:              null,
-        issue:                  null,
-        fix:                    null,
+        beMismatch,
+        beStatus,
+        rootCause:              beMismatch ? 'MAPPING_ISSUE' : null,
+        issue:                  beMismatch
+          ? `Belgian account ${beAccount} does not match expected ${expectedBeAccount} for US account ${usAccount}.`
+          : null,
+        fix:                    beMismatch
+          ? `Update the posting profile to use Belgian PCMN account ${expectedBeAccount} instead of ${beAccount}.`
+          : null,
       },
     };
   }
@@ -181,16 +225,20 @@ function _analyseEntry(entry, mappings) {
     gaapAnalysis: {
       mappingStatus:          'incorrect',
       mappingFound:           true,
-      usAccount, frAccount,
-      expectedFrAccount,
+      usAccount, frAccount, beAccount,
+      expectedFrAccount, expectedBeAccount,
       mappedType:             mapping.type        || null,
       mappedDescription:      mapping.description || null,
       mappedModule:           mapping.module      || null,
       frClassification:       frClass,
       expFrClassification:    expFrClass,
+      beClassification:       beClass,
+      expBeClassification:    expBeClass,
       usClassification:       usClass,
       gaapMismatch:           true,
       classificationMismatch: !classificationMatch,
+      beMismatch,
+      beStatus,
       rootCause,
       issue: issueDetail,
       fix:   fixDetail,
@@ -330,7 +378,9 @@ function _reconcileVoucher(voucher) {
           voucherId: voucher.voucherId,
           usAccount: ga.usAccount,
           frAccount: ga.frAccount,
+          beAccount: ga.beAccount,
           expectedFrAccount: null,
+          expectedBeAccount: null,
           description: entry.description || '',
           amount:      (entry.debit || 0) || (entry.credit || 0),
           side:        entry.debit > 0 ? 'DR' : 'CR',
@@ -344,6 +394,25 @@ function _reconcileVoucher(voucher) {
       default:
         break;
     }
+
+    // Belgium PCMN mismatch (additional issue, independent of FR status)
+    if (ga?.beMismatch) {
+      issues.push({
+        type:             'INCORRECT_BE_ACCOUNT',
+        severity:         'medium',
+        voucherId:        voucher.voucherId,
+        usAccount:        ga.usAccount,
+        frAccount:        ga.frAccount,
+        beAccount:        ga.beAccount,
+        expectedBeAccount: ga.expectedBeAccount,
+        description:      entry.description || '',
+        amount:           (entry.debit || 0) || (entry.credit || 0),
+        side:             entry.debit > 0 ? 'DR' : 'CR',
+        issue:            ga.issue,
+        fix:              ga.fix,
+        rootCause:        'MAPPING_ISSUE',
+      });
+    }
   }
 
   // Count by status
@@ -353,11 +422,18 @@ function _reconcileVoucher(voucher) {
     ['missing','missing_fr','missing_us'].includes(e.gaapAnalysis?.mappingStatus)
   ).length;
 
+  // BE-specific counts
+  const beCorrect  = entries.filter(e => e.gaapAnalysis?.beStatus === 'correct').length;
+  const beIncorrect= entries.filter(e => e.gaapAnalysis?.beStatus === 'incorrect').length;
+  const beMissing  = entries.filter(e => e.gaapAnalysis?.beStatus === 'missing').length;
+
   // Account classifications
   const usPl = entries.filter(e => e.gaapAnalysis?.usClassification === 'P&L').length;
   const usBs = entries.filter(e => e.gaapAnalysis?.usClassification === 'BS').length;
   const frPl = entries.filter(e => e.gaapAnalysis?.frClassification === 'P&L').length;
   const frBs = entries.filter(e => e.gaapAnalysis?.frClassification === 'BS').length;
+  const bePl = entries.filter(e => e.gaapAnalysis?.beClassification === 'P&L').length;
+  const beBs = entries.filter(e => e.gaapAnalysis?.beClassification === 'BS').length;
 
   const mappingCoverage = entries.length > 0
     ? Math.round((correct / entries.length) * 100)
@@ -376,12 +452,14 @@ function _reconcileVoucher(voucher) {
     correctMappings:   correct,
     incorrectMappings: incorrect,
     missingMappings:   missing,
+    beCorrect, beIncorrect, beMissing,
     mappingCoverage,
-    usPl, usBs, frPl, frBs,
+    usPl, usBs, frPl, frBs, bePl, beBs,
     issues,
     status,
     hasClassificationMismatch: issues.some(i => i.type === 'CLASSIFICATION_MISMATCH'),
     hasIncorrectAccounts:      issues.some(i => i.type === 'INCORRECT_FR_ACCOUNT'),
+    hasIncorrectBeAccounts:    issues.some(i => i.type === 'INCORRECT_BE_ACCOUNT'),
     hasMissingMappings:        issues.some(i => i.type === 'MISSING_MAPPING'),
   };
 }
@@ -409,9 +487,10 @@ function _reconcileVoucher(voucher) {
  *   }
  */
 function validateDualGaap(sheetData, context = {}) {
-  // Check whether any entry actually has an frAccount column
-  const rawEntries = sheetData.entries || [];
-  const isDualGaap = rawEntries.some(e => e.frAccount && String(e.frAccount).trim() !== '');
+  // Check whether any entry has an frAccount or beAccount column
+  const rawEntries  = sheetData.entries || [];
+  const isDualGaap  = rawEntries.some(e => e.frAccount && String(e.frAccount).trim() !== '');
+  const isTripleGaap = rawEntries.some(e => e.beAccount && String(e.beAccount).trim() !== '');
 
   let mappings = [];
   try {
@@ -421,7 +500,7 @@ function validateDualGaap(sheetData, context = {}) {
   }
 
   // ── Step 1: enrich each entry (skip analysis for non-dual-GAAP sheets) ───
-  const enrichedEntries = isDualGaap
+  const enrichedEntries = (isDualGaap || isTripleGaap)
     ? rawEntries.map(e => _analyseEntry(e, mappings))
     : rawEntries.map(e => ({ ...e, gaapAnalysis: null }));
 
@@ -456,16 +535,23 @@ function validateDualGaap(sheetData, context = {}) {
   const missing    = enrichedEntries.filter(e =>
     ['missing','missing_fr','missing_us'].includes(e.gaapAnalysis?.mappingStatus)
   ).length;
-  const conflicting = consistencyIssues.filter(i => i.type === 'CONFLICTING_MAPPING').length;
-  const total       = enrichedEntries.length;
-  const coveragePct = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const conflicting  = consistencyIssues.filter(i => i.type === 'CONFLICTING_MAPPING').length;
+  const total        = enrichedEntries.length;
+  const coveragePct  = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+  const beCorrect    = enrichedEntries.filter(e => e.gaapAnalysis?.beStatus === 'correct').length;
+  const beIncorrect  = enrichedEntries.filter(e => e.gaapAnalysis?.beStatus === 'incorrect').length;
+  const beMissing    = enrichedEntries.filter(e => e.gaapAnalysis?.beStatus === 'missing').length;
+  const beTotal      = enrichedEntries.filter(e => e.gaapAnalysis?.beStatus != null).length;
+  const beCoveragePct = beTotal > 0 ? Math.round((beCorrect / beTotal) * 100) : 0;
 
   const overallStatus =
-    conflicting > 0 || incorrect > 0 ? 'error'   :
-    missing     > 0                  ? 'warning' : 'clean';
+    conflicting > 0 || incorrect > 0 || beIncorrect > 0 ? 'error'   :
+    missing     > 0 || beMissing > 0                    ? 'warning' : 'clean';
 
   return {
     isDualGaap,
+    isTripleGaap,
     entries:           enrichedEntries,
     vouchers:          enrichedVouchers,
     stats:             sheetData.stats || {},
@@ -480,6 +566,11 @@ function validateDualGaap(sheetData, context = {}) {
       consistencyErrors: consistencyIssues.length,
       overallStatus,
       coveragePct,
+      beCorrect,
+      beIncorrect,
+      beMissing,
+      beCoveragePct,
+      isTripleGaap,
     },
   };
 }
@@ -495,4 +586,4 @@ function validateEntry(usAccount, frAccount) {
   return _analyseEntry(synthetic, mappings).gaapAnalysis;
 }
 
-module.exports = { validateDualGaap, validateEntry };
+module.exports = { validateDualGaap, validateEntry, classifyBeAccount, classifyFrAccount };

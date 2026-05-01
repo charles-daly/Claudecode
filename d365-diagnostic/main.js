@@ -219,6 +219,75 @@ ipcMain.handle('gaap:delete', async (_event, id) => {
   }
 });
 
+// ─── IPC: GAAP Mapping Import (preview) ──────────────────────
+ipcMain.handle('gaap:importPreview', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Mapping File to Import',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Spreadsheet / CSV', extensions: ['xlsx', 'xls', 'csv'] },
+    ],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) return null;
+
+  try {
+    const { previewImport } = require('./src/engine/mappingImportEngine');
+    return previewImport(result.filePaths[0]);
+  } catch (err) {
+    return { success: false, rows: [], stats: {}, errors: [err.message] };
+  }
+});
+
+// ─── IPC: GAAP Mapping Import (apply) ────────────────────────
+ipcMain.handle('gaap:importApply', async (_event, rows, opts) => {
+  try {
+    const { applyImport } = require('./src/engine/mappingImportEngine');
+    return applyImport(rows, opts || {});
+  } catch (err) {
+    return { success: false, added: 0, updated: 0, skipped: 0, errors: [err.message] };
+  }
+});
+
+// ─── IPC: GAAP Mapping Export ─────────────────────────────────
+ipcMain.handle('gaap:exportMappings', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export GAAP Mappings',
+    defaultPath: `GAAP_Mappings_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    filters: [
+      { name: 'Excel Files', extensions: ['xlsx'] },
+      { name: 'CSV Files',   extensions: ['csv'] },
+    ],
+  });
+
+  if (result.canceled) return { success: false, canceled: true };
+
+  try {
+    const { getAllMappings } = require('./src/engine/gaapMappingEngine');
+    const XLSX = require('xlsx');
+    const mappings = getAllMappings();
+
+    const rows = mappings.map(m => ({
+      ID:           m.id,
+      US_Account:   m.usAccount,
+      FR_Account:   m.frAccount,
+      BE_Account:   m.beAccount || '',
+      Type:         m.type,
+      Description:  m.description || '',
+      Module:       m.module || '',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'GAAP Mappings');
+    XLSX.writeFile(wb, result.filePath);
+
+    return { success: true, filePath: result.filePath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

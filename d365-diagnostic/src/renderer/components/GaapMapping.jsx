@@ -17,7 +17,10 @@ const MODULES = [
   { value: 'general_ledger', label: 'General Ledger' },
 ];
 
-const BLANK_FORM = { usAccount: '', frAccount: '', type: '', description: '', module: '' };
+const BLANK_FORM = { usAccount: '', frAccount: '', beAccount: '', type: '', description: '', module: '' };
+
+const STATUS_COLOR  = { new: '#22c55e', duplicate: '#f59e0b', conflict: '#f97316', invalid: '#ef4444' };
+const STATUS_LABEL  = { new: 'New', duplicate: 'Duplicate', conflict: 'Conflict', invalid: 'Invalid' };
 
 export default function GaapMapping() {
   const [mappings,    setMappings]    = useState([]);
@@ -33,10 +36,13 @@ export default function GaapMapping() {
   const [saving,      setSaving]      = useState(false);
   const [deleteId,    setDeleteId]    = useState(null);
   const [toast,       setToast]       = useState(null);
+  const [importModal, setImportModal] = useState(null);  // { rows, stats, colMap }
+  const [importOpts,  setImportOpts]  = useState({ mode: 'merge', onConflict: 'skip' });
+  const [importing,   setImporting]   = useState(false);
 
   const showToast = useCallback((msg, ok = true) => {
     setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   }, []);
 
   const load = useCallback(async () => {
@@ -67,7 +73,14 @@ export default function GaapMapping() {
 
   const openEdit = (m) => {
     setEditId(m.id);
-    setForm({ usAccount: m.usAccount, frAccount: m.frAccount, type: m.type, description: m.description || '', module: m.module || '' });
+    setForm({
+      usAccount:   m.usAccount,
+      frAccount:   m.frAccount,
+      beAccount:   m.beAccount || '',
+      type:        m.type,
+      description: m.description || '',
+      module:      m.module || '',
+    });
     setFormErrors([]);
     setShowForm(true);
   };
@@ -90,7 +103,8 @@ export default function GaapMapping() {
         resp = await window.electronAPI.gaapAdd(form);
       }
       if (resp.success) {
-        showToast(editId ? 'Mapping updated.' : 'Mapping added.');
+        const warn = resp.warnings?.length ? ` (${resp.warnings[0]})` : '';
+        showToast((editId ? 'Mapping updated.' : 'Mapping added.') + warn, !resp.warnings?.length);
         closeForm();
         load();
       } else {
@@ -118,16 +132,62 @@ export default function GaapMapping() {
     }
   };
 
+  const handleImport = async () => {
+    try {
+      const resp = await window.electronAPI.gaapImportPreview();
+      if (!resp) return;
+      if (!resp.success) {
+        showToast((resp.errors || ['Import failed']).join(' · '), false);
+        return;
+      }
+      setImportModal({ rows: resp.rows, stats: resp.stats, colMap: resp.colMap });
+    } catch (e) {
+      showToast(e.message, false);
+    }
+  };
+
+  const handleImportApply = async () => {
+    if (!importModal) return;
+    setImporting(true);
+    try {
+      const resp = await window.electronAPI.gaapImportApply(importModal.rows, importOpts);
+      if (resp.success) {
+        showToast(`Import done — ${resp.added} added, ${resp.updated} updated, ${resp.skipped} skipped.`);
+        setImportModal(null);
+        load();
+      } else {
+        showToast((resp.errors || ['Apply failed']).join(' · '), false);
+      }
+    } catch (e) {
+      showToast(e.message, false);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const resp = await window.electronAPI.gaapExportMappings();
+      if (resp?.success) showToast('Mappings exported.');
+      else if (resp && !resp.canceled) showToast(resp.error || 'Export failed.', false);
+    } catch (e) {
+      showToast(e.message, false);
+    }
+  };
+
   // ── Filtered view ──────────────────────────────────────────────────────────
   const visible = mappings.filter(m => {
     if (filterMod  && m.module !== filterMod)   return false;
     if (filterType && m.type   !== filterType)   return false;
     if (filterText) {
       const q = filterText.toLowerCase();
-      if (![m.usAccount, m.frAccount, m.description, m.type].some(v => (v || '').toLowerCase().includes(q))) return false;
+      if (![m.usAccount, m.frAccount, m.beAccount, m.description, m.type]
+        .some(v => (v || '').toLowerCase().includes(q))) return false;
     }
     return true;
   });
+
+  const beCount = mappings.filter(m => m.beAccount).length;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -144,17 +204,31 @@ export default function GaapMapping() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>GAAP Mapping</h1>
           <p style={{ fontSize: 13, color: '#64748b' }}>
-            Manage US GAAP ↔ French PCG account mappings. Used by the diagnostic engine to detect cross-GAAP mismatches and provide traceability.
+            Manage US GAAP ↔ French PCG ↔ Belgian PCMN account mappings for cross-GAAP diagnostic traceability.
           </p>
         </div>
-        <button style={S.addBtn} onClick={openAdd}>+ Add Mapping</button>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button style={S.secBtn} onClick={handleExport}>↓ Export</button>
+          <button style={S.secBtn} onClick={handleImport}>↑ Import</button>
+          <button style={S.addBtn} onClick={openAdd}>+ Add Mapping</button>
+        </div>
       </div>
 
       {/* Stats strip */}
       <div style={S.statsStrip}>
         <div style={S.stat}>
           <span style={{ fontSize: 24, fontWeight: 800, color: '#3b82f6' }}>{mappings.length}</span>
-          <span style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>Total Mappings</span>
+          <span style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>Total</span>
+        </div>
+        <div style={S.stat}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: '#22c55e' }}>{beCount}</span>
+          <span style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>BE Mapped</span>
+        </div>
+        <div style={S.stat}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: mappings.length > beCount ? '#f59e0b' : '#22c55e' }}>
+            {mappings.length - beCount}
+          </span>
+          <span style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: .5 }}>Missing BE</span>
         </div>
         {['pma','procurement','sales','fixed_assets','inventory','lease','general_ledger'].map(mod => {
           const n = mappings.filter(m => m.module === mod).length;
@@ -212,9 +286,9 @@ export default function GaapMapping() {
             <thead>
               <tr style={{ background: '#0d1219' }}>
                 <Th>ID</Th>
-                <Th>US GAAP Account</Th>
-                <Th>↔</Th>
-                <Th>French PCG Account</Th>
+                <Th>US GAAP</Th>
+                <Th style={{ color: '#34d399' }}>French PCG</Th>
+                <Th style={{ color: '#fb923c' }}>Belgian PCMN</Th>
                 <Th>Type</Th>
                 <Th>Description</Th>
                 <Th>Module</Th>
@@ -231,12 +305,17 @@ export default function GaapMapping() {
                 >
                   <td style={{ ...S.td, color: '#475569', fontFamily: 'monospace' }}>{m.id}</td>
                   <td style={{ ...S.td, fontWeight: 700, color: '#60a5fa', fontFamily: 'monospace' }}>{m.usAccount}</td>
-                  <td style={{ ...S.td, color: '#334155', textAlign: 'center' }}>↔</td>
                   <td style={{ ...S.td, fontWeight: 700, color: '#34d399', fontFamily: 'monospace' }}>{m.frAccount}</td>
+                  <td style={{ ...S.td, fontFamily: 'monospace' }}>
+                    {m.beAccount
+                      ? <span style={{ fontWeight: 700, color: '#fb923c' }}>{m.beAccount}</span>
+                      : <span style={{ color: '#334155', fontStyle: 'italic' }}>—</span>
+                    }
+                  </td>
                   <td style={S.td}>
                     <span style={S.typeBadge}>{m.type}</span>
                   </td>
-                  <td style={{ ...S.td, color: '#94a3b8', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ ...S.td, color: '#94a3b8', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {m.description || '—'}
                   </td>
                   <td style={{ ...S.td, color: '#64748b' }}>{m.module || '—'}</td>
@@ -286,10 +365,18 @@ export default function GaapMapping() {
               </FormField>
               <FormField label="French PCG Account *" hint="e.g. 411">
                 <input
-                  style={S.inp}
+                  style={{ ...S.inp, borderColor: '#1e4d3a' }}
                   value={form.frAccount}
                   onChange={e => setForm(f => ({ ...f, frAccount: e.target.value }))}
                   placeholder="411"
+                />
+              </FormField>
+              <FormField label="Belgian PCMN Account" hint="Optional — e.g. 400">
+                <input
+                  style={{ ...S.inp, borderColor: '#4a2e1a' }}
+                  value={form.beAccount}
+                  onChange={e => setForm(f => ({ ...f, beAccount: e.target.value }))}
+                  placeholder="400"
                 />
               </FormField>
               <FormField label="Account Type *" hint="Classification">
@@ -330,13 +417,124 @@ export default function GaapMapping() {
           </div>
         </div>
       )}
+
+      {/* Import preview modal */}
+      {importModal && (
+        <div style={S.overlay} onClick={() => !importing && setImportModal(null)}>
+          <div style={{ ...S.modal, width: 700, maxWidth: '96vw', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#e2e8f0' }}>Import Preview</h2>
+              <button style={S.closeBtn} onClick={() => setImportModal(null)}>✕</button>
+            </div>
+
+            {/* Stats row */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Total',     n: importModal.stats.total,     color: '#94a3b8' },
+                { label: 'New',       n: importModal.stats.new,       color: '#22c55e' },
+                { label: 'Duplicate', n: importModal.stats.duplicate, color: '#f59e0b' },
+                { label: 'Conflict',  n: importModal.stats.conflict,  color: '#f97316' },
+                { label: 'Invalid',   n: importModal.stats.invalid,   color: '#ef4444' },
+              ].map(s => (
+                <div key={s.label} style={{ textAlign: 'center', background: '#0d1219', border: `1px solid ${s.color}33`, borderRadius: 8, padding: '8px 14px', minWidth: 70 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.n}</div>
+                  <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase' }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Options */}
+            <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap', background: '#0d1219', borderRadius: 8, padding: '12px 14px' }}>
+              <div>
+                <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: .6, marginBottom: 6 }}>Mode</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {[['merge','Merge (add new only)'],['overwrite','Overwrite (replace conflicts)']].map(([v, label]) => (
+                    <button
+                      key={v}
+                      onClick={() => setImportOpts(o => ({ ...o, mode: v }))}
+                      style={{ ...S.optBtn, ...(importOpts.mode === v ? S.optBtnOn : {}) }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {importOpts.mode === 'merge' && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: .6, marginBottom: 6 }}>On Conflict</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[['skip','Skip'],['replace','Replace']].map(([v, label]) => (
+                      <button
+                        key={v}
+                        onClick={() => setImportOpts(o => ({ ...o, onConflict: v }))}
+                        style={{ ...S.optBtn, ...(importOpts.onConflict === v ? S.optBtnOn : {}) }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Rows table */}
+            <div style={{ background: '#0d1219', border: '1px solid #1e293b', borderRadius: 8, overflow: 'auto', maxHeight: 300, marginBottom: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    {['Row','US GAAP','French PCG','Belgian PCMN','Type','Status'].map(h => (
+                      <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: '#475569', fontSize: 9, textTransform: 'uppercase', letterSpacing: .6, borderBottom: '1px solid #1e293b', background: '#0d1219', position: 'sticky', top: 0 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {importModal.rows.map((row, i) => {
+                    const color = STATUS_COLOR[row.status] || '#64748b';
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #1a1f2e' }}>
+                        <td style={{ padding: '5px 8px', color: '#475569', fontFamily: 'monospace' }}>{row.rowNum}</td>
+                        <td style={{ padding: '5px 8px', color: '#60a5fa', fontFamily: 'monospace' }}>{row.usAccount || '—'}</td>
+                        <td style={{ padding: '5px 8px', color: '#34d399', fontFamily: 'monospace' }}>{row.frAccount || '—'}</td>
+                        <td style={{ padding: '5px 8px', color: '#fb923c', fontFamily: 'monospace' }}>{row.beAccount || '—'}</td>
+                        <td style={{ padding: '5px 8px', color: '#94a3b8' }}>{row.type || '—'}</td>
+                        <td style={{ padding: '5px 8px' }}>
+                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 999, background: color + '22', color, fontWeight: 700, textTransform: 'uppercase' }}>
+                            {STATUS_LABEL[row.status] || row.status}
+                          </span>
+                          {row.warnings?.length > 0 && (
+                            <span style={{ marginLeft: 4, fontSize: 9, color: '#f59e0b' }} title={row.warnings.join('\n')}>⚠</span>
+                          )}
+                          {row.errors?.length > 0 && (
+                            <span style={{ marginLeft: 4, fontSize: 9, color: '#ef4444' }} title={row.errors.join('\n')}>✗</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button style={S.cancelFormBtn} onClick={() => setImportModal(null)} disabled={importing}>Cancel</button>
+              <button
+                style={{ ...S.addBtn, opacity: importing || importModal.stats.new + importModal.stats.conflict === 0 ? .5 : 1 }}
+                onClick={handleImportApply}
+                disabled={importing || importModal.stats.new + importModal.stats.conflict === 0}
+              >
+                {importing ? 'Applying…' : `Apply Import (${importModal.stats.new} new, ${importModal.stats.conflict} conflicts)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function Th({ children }) {
+function Th({ children, style }) {
   return (
-    <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .6, color: '#475569', borderBottom: '1px solid #1e293b' }}>
+    <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: .6, color: '#475569', borderBottom: '1px solid #1e293b', ...style }}>
       {children}
     </th>
   );
@@ -355,6 +553,7 @@ function FormField({ label, hint, children, fullWidth }) {
 
 const S = {
   addBtn: { padding: '9px 18px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  secBtn: { padding: '9px 14px', background: 'none', border: '1px solid #334155', color: '#94a3b8', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   statsStrip: { display: 'flex', gap: 20, flexWrap: 'wrap', background: '#1a1f2e', border: '1px solid #1e293b', borderRadius: 10, padding: '14px 20px', marginBottom: 16, alignItems: 'center' },
   stat: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 56 },
   filters: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' },
@@ -372,10 +571,12 @@ const S = {
   center: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 40px', color: '#64748b', gap: 8 },
   toast: { position: 'fixed', top: 20, right: 20, zIndex: 9999, padding: '10px 18px', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, boxShadow: '0 4px 16px #0008' },
   overlay: { position: 'fixed', inset: 0, background: '#000a', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  modal: { background: '#1a1f2e', border: '1px solid #334155', borderRadius: 12, padding: '24px', width: 560, maxWidth: '95vw', boxShadow: '0 8px 40px #000c' },
+  modal: { background: '#1a1f2e', border: '1px solid #334155', borderRadius: 12, padding: '24px', width: 580, maxWidth: '95vw', boxShadow: '0 8px 40px #000c' },
   closeBtn: { background: 'none', border: 'none', color: '#475569', fontSize: 18, cursor: 'pointer', padding: '0 4px' },
   errBox: { background: '#450a0a', border: '1px solid #b91c1c', borderRadius: 6, padding: '10px 14px', fontSize: 12, color: '#fca5a5', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 4 },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 16px' },
   inp: { width: '100%', background: '#0f1117', border: '1px solid #334155', borderRadius: 6, color: '#e2e8f0', padding: '8px 10px', fontSize: 13, outline: 'none', boxSizing: 'border-box' },
   cancelFormBtn: { padding: '9px 18px', background: 'none', border: '1px solid #334155', color: '#94a3b8', borderRadius: 6, fontSize: 13, cursor: 'pointer' },
+  optBtn:   { padding: '5px 12px', background: 'none', border: '1px solid #334155', borderRadius: 5, color: '#64748b', fontSize: 11, cursor: 'pointer' },
+  optBtnOn: { background: '#1e3a5f', borderColor: '#3b82f6', color: '#60a5fa' },
 };

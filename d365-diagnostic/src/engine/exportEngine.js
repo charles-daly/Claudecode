@@ -53,6 +53,7 @@ async function exportToExcel({ diagnosticResult, context, filePath }) {
   addUniversalModelSheet(wb, diagnosticResult);
   addAccrualSheet(wb, diagnosticResult, context);
   addDualGaapSheet(wb, diagnosticResult);
+  addMultiGaapMappingSheet(wb);
   addFinancialImpactSheet(wb, diagnosticResult);
   addCurrencySheet(wb, diagnosticResult);
   addFxAnalysisSheet(wb, diagnosticResult);
@@ -324,6 +325,9 @@ async function exportToWord({ diagnosticResult, context, filePath }) {
 
         heading2('13.  FOREIGN EXCHANGE ANALYSIS'),
         ...fxWordSection(diagnosticResult),
+
+        heading2('14.  MULTI-GAAP MAPPING ANALYSIS'),
+        ...multiGaapWordSection(),
 
         spacer(),
         para(
@@ -1763,6 +1767,170 @@ function fxWordSection(diagnosticResult) {
       parts.push(spacer());
     });
   });
+
+  return parts;
+}
+
+// ─── Multi-GAAP Mapping — Excel sheet ────────────────────────────────────────
+function addMultiGaapMappingSheet(wb) {
+  let mappings = [];
+  try {
+    const { getAllMappings } = require('./gaapMappingEngine');
+    mappings = getAllMappings();
+  } catch (_) {
+    mappings = [];
+  }
+
+  const ws = wb.addWorksheet('Multi-GAAP Mapping');
+  ws.columns = [
+    { header: 'ID',            key: 'id',          width: 8 },
+    { header: 'US GAAP',       key: 'usAccount',   width: 16 },
+    { header: 'French PCG',    key: 'frAccount',   width: 16 },
+    { header: 'Belgian PCMN',  key: 'beAccount',   width: 16 },
+    { header: 'Type',          key: 'type',         width: 22 },
+    { header: 'Description',   key: 'description',  width: 44 },
+    { header: 'Module',        key: 'module',       width: 16 },
+    { header: 'BE Status',     key: 'beStatus',     width: 16 },
+  ];
+
+  // Header row styling
+  const hdr = ws.getRow(1);
+  hdr.font   = { bold: true, color: { argb: C.white }, size: 10 };
+  hdr.fill   = fill(C.navy);
+  hdr.height = 22;
+  hdr.alignment = { vertical: 'middle' };
+
+  // Detect BE conflicts (same beAccount for multiple usAccounts)
+  const beConflictMap = {};
+  for (const m of mappings) {
+    if (!m.beAccount) continue;
+    if (!beConflictMap[m.beAccount]) beConflictMap[m.beAccount] = [];
+    beConflictMap[m.beAccount].push(m.id);
+  }
+
+  mappings.forEach((m, i) => {
+    const rowNum = i + 2;
+    const hasBe      = Boolean(m.beAccount);
+    const isConflict = hasBe && beConflictMap[m.beAccount]?.length > 1;
+    const beStatus   = isConflict ? 'Conflict' : hasBe ? 'Mapped' : 'Missing';
+
+    const rowFill = isConflict
+      ? fill('FFF97316')   // orange — conflict
+      : !hasBe
+        ? fill('FFF59E0B') // yellow — missing BE
+        : fill('FF22C55E'); // green — complete
+
+    const row = ws.getRow(rowNum);
+    row.values = [m.id, m.usAccount, m.frAccount, m.beAccount || '', m.type, m.description, m.module, beStatus];
+
+    // Color-code US (blue), FR (green), BE (orange)
+    row.getCell(2).font = { bold: true, color: { argb: 'FF3B82F6' } };
+    row.getCell(3).font = { bold: true, color: { argb: 'FF22C55E' } };
+    if (hasBe) row.getCell(4).font = { bold: true, color: { argb: isConflict ? 'FFEF4444' : 'FFFB923C' } };
+
+    // BE Status cell background
+    row.getCell(8).fill = { type: 'pattern', pattern: 'solid',
+      fgColor: { argb: isConflict ? 'FFFEE2E2' : !hasBe ? 'FFFFF7ED' : 'FFF0FFF4' } };
+    row.getCell(8).font = { bold: true, color: { argb: isConflict ? 'FFDC2626' : !hasBe ? 'FFB45309' : 'FF15803D' } };
+
+    // Light alternating row background
+    if (!isConflict && hasBe && i % 2 === 0) {
+      for (let c = 1; c <= 7; c++) {
+        row.getCell(c).fill = fill('FF1A1F2E');
+      }
+    }
+    row.font = { size: 10 };
+    row.height = 18;
+  });
+
+  // Summary rows at bottom
+  const total    = mappings.length;
+  const mapped   = mappings.filter(m => m.beAccount).length;
+  const missing  = total - mapped;
+  const conflicts= Object.values(beConflictMap).filter(ids => ids.length > 1).length;
+
+  const summaryRow = ws.getRow(mappings.length + 3);
+  summaryRow.values = ['', 'Total', total, 'BE Mapped', mapped, 'Missing BE', missing, `Conflicts: ${conflicts}`];
+  summaryRow.font   = { bold: true, size: 10, color: { argb: C.white } };
+  summaryRow.fill   = fill(C.navy);
+  summaryRow.height = 20;
+}
+
+// ─── Multi-GAAP Mapping — Word section ───────────────────────────────────────
+function multiGaapWordSection() {
+  let mappings = [];
+  try {
+    const { getAllMappings } = require('./gaapMappingEngine');
+    mappings = getAllMappings();
+  } catch (_) {
+    mappings = [];
+  }
+
+  if (mappings.length === 0) {
+    return [para('No account mappings are defined.', { color: '888888', italics: true })];
+  }
+
+  const total    = mappings.length;
+  const mapped   = mappings.filter(m => m.beAccount).length;
+  const missing  = total - mapped;
+
+  const beConflictMap = {};
+  for (const m of mappings) {
+    if (!m.beAccount) continue;
+    if (!beConflictMap[m.beAccount]) beConflictMap[m.beAccount] = [];
+    beConflictMap[m.beAccount].push(m.id);
+  }
+  const conflictCount = Object.values(beConflictMap).filter(ids => ids.length > 1).length;
+
+  const parts = [
+    para(`Total mappings: ${total}  ·  BE mapped: ${mapped}  ·  Missing BE: ${missing}  ·  BE conflicts: ${conflictCount}`, { size: 20 }),
+    spacer(),
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          tableHeader: true,
+          children: ['ID','US GAAP','French PCG','Belgian PCMN','Type','BE Status'].map(h =>
+            new TableCell({
+              shading: { fill: '1A3A5C', type: ShadingType.SOLID },
+              children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })],
+            })
+          ),
+        }),
+        ...mappings.map(m => {
+          const isConflict = m.beAccount && beConflictMap[m.beAccount]?.length > 1;
+          const beStatus   = isConflict ? 'Conflict' : m.beAccount ? 'Mapped' : 'Missing';
+          const beFill     = isConflict ? 'FEE2E2' : m.beAccount ? 'F0FFF4' : 'FFFBEB';
+          return new TableRow({
+            children: [
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: m.id, size: 16 })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: m.usAccount, bold: true, color: '1D4ED8', size: 16 })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: m.frAccount, bold: true, color: '15803D', size: 16 })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: m.beAccount || '—', bold: Boolean(m.beAccount), color: m.beAccount ? 'C2410C' : '94A3B8', size: 16 })] })] }),
+              new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: m.type, size: 16 })] })] }),
+              new TableCell({
+                shading: { fill: beFill, type: ShadingType.SOLID },
+                children: [new Paragraph({ children: [new TextRun({ text: beStatus, bold: true, size: 16,
+                  color: isConflict ? 'DC2626' : m.beAccount ? '15803D' : 'B45309' })] })],
+              }),
+            ],
+          });
+        }),
+      ],
+    }),
+    spacer(),
+  ];
+
+  // Conflict detail section
+  const conflicts = Object.entries(beConflictMap).filter(([, ids]) => ids.length > 1);
+  if (conflicts.length > 0) {
+    parts.push(para('BE Account Conflicts:', { bold: true, size: 20 }));
+    for (const [beAcc, ids] of conflicts) {
+      const conflicting = mappings.filter(m => ids.includes(m.id));
+      parts.push(bullet(`BE account ${beAcc} is referenced by ${ids.length} different US accounts: ${conflicting.map(m => `${m.usAccount} (${m.frAccount})`).join(', ')}. Standardise or split the mapping.`));
+    }
+    parts.push(spacer());
+  }
 
   return parts;
 }

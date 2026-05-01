@@ -1,23 +1,26 @@
 {
   "_meta": {
-    "version": "1.0",
-    "lastUpdated": "2026-04-29",
-    "description": "US GAAP to French GAAP (PCG) account mapping table"
+    "version": "2.0",
+    "lastUpdated": "2026-05-01",
+    "description": "US GAAP ↔ French PCG (PCG) ↔ Belgian PCMN account mapping table"
   },
   "mappings": [
-    { "id": "m001", "usAccount": "52000",  "frAccount": "641",  "type": "Cost",                    "description": "Salaries & wages expense",                   "module": "pma" },
-    { "id": "m002", "usAccount": "550000", "frAccount": "622",  "type": "Cost",                    "description": "Professional services / subcontracting",     "module": "pma" },
-    { "id": "m003", "usAccount": "400100", "frAccount": "706",  "type": "Revenue",                 "description": "Service revenue",                           "module": "pma" },
-    { "id": "m004", "usAccount": "400200", "frAccount": "701",  "type": "Revenue",                 "description": "Product sales revenue",                     "module": "sales" },
-    { "id": "m005", "usAccount": "500100", "frAccount": "607",  "type": "COGS",                    "description": "Cost of goods sold",                        "module": "sales" },
-    { "id": "m006", "usAccount": "110000", "frAccount": "411",  "type": "Receivable",              "description": "Trade accounts receivable",                 "module": "sales" },
-    { "id": "m007", "usAccount": "200000", "frAccount": "401",  "type": "Payable",                 "description": "Trade accounts payable",                    "module": "procurement" },
-    { "id": "m008", "usAccount": "205000", "frAccount": "408",  "type": "Accrual",                 "description": "Accrued liabilities / uninvoiced receipts", "module": "procurement" },
-    { "id": "m009", "usAccount": "510000", "frAccount": "6811", "type": "Depreciation",            "description": "Depreciation expense — fixed assets",       "module": "fixed_assets" },
-    { "id": "m010", "usAccount": "159000", "frAccount": "2818", "type": "Accumulated Depreciation","description": "Accumulated depreciation — assets",         "module": "fixed_assets" },
-    { "id": "m011", "usAccount": "600100", "frAccount": "6618", "type": "Interest",                "description": "Finance lease interest expense",            "module": "lease" },
-    { "id": "m012", "usAccount": "210000", "frAccount": "1681", "type": "Liability",               "description": "Finance lease liability",                   "module": "lease" },
-    { "id": "m013", "usAccount": "152000", "frAccount": "2319", "type": "Asset",                   "description": "ROU asset — finance lease",                 "module": "lease" },
-    { "id": "m014", "usAccount": "215000", "frAccount": "421",  "type": "Payable",                 "description": "Salaries & wages payable",                  "module": "pma" }
+    { "id": "m001", "usAccount": "52000",  "frAccount": "641",  "beAccount": "620",  "type": "Cost",                    "description": "Salaries & wages expense",                   "module": "pma" },
+    { "id": "m002", "usAccount": "550000", "frAccount": "622",  "beAccount": "611",  "type": "Cost",                    "description": "Professional services / subcontracting",     "module": "pma" },
+    { "id": "m003", "usAccount": "400100", "frAccount": "706",  "beAccount": "704",  "type": "Revenue",                 "description": "Service revenue",                           "module": "pma" },
+    { "id": "m004", "usAccount": "400200", "frAccount": "701",  "beAccount": "700",  "type": "Revenue",                 "description": "Product sales revenue",                     "module": "sales" },
+    { "id": "m005", "usAccount": "500100", "frAccount": "607",  "beAccount": "600",  "type": "COGS",                    "description": "Cost of goods sold",                        "module": "sales" },
+    { "id": "m006", "usAccount": "110000", "frAccount": "411",  "beAccount": "400",  "type": "Receivable",              "description": "Trade accounts receivable",                 "module": "sales" },
+    { "id": "m007", "usAccount": "200000", "frAccount": "401",  "beAccount": "440",  "type": "Payable",                 "description": "Trade accounts payable",                    "module": "procurement" },
+    { "id": "m008", "usAccount": "205000", "frAccount": "408",  "beAccount": "449",  "type": "Accrual",                 "description": "Accrued liabilities / uninvoiced receipts", "module": "procurement" },
+    { "id": "m009", "usAccount": "510000", "frAccount": "6811", "beAccount": "630",  "type": "Depreciation",            "description": "Depreciation expense — fixed assets",       "module": "fixed_assets" },
+    { "id": "m010", "usAccount": "159000", "frAccount": "2818", "beAccount": "229",  "type": "Accumulated Depreciation","description": "Accumulated depreciation — assets",         "module": "fixed_assets" },
+    { "id": "m011", "usAccount": "600100", "frAccount": "6618", "beAccount": "650",  "type": "Interest",                "description": "Finance lease interest expense",            "module": "lease" },
+    { "id": "m012", "usAccount": "210000", "frAccount": "1681", "beAccount": "172",  "type": "Liability",               "description": "Finance lease liability",                   "module": "lease" },
+    { "id": "m013", "usAccount": "152000", "frAccount": "2319", "beAccount": "230",  "type": "Asset",                   "description": "ROU asset — finance lease",                 "module": "lease" },
+    { "id": "m014", "usAccount": "215000", "frAccount": "421",  "beAccount": "455",  "type": "Payable",                 "description": "Salaries & wages payable",                  "module": "pma" },
+    { "id": "m015", "usAccount": "300100", "frAccount": "213",  "beAccount": "221",  "type": "Asset",                   "description": "Land and buildings — fixed assets",         "module": "fixed_assets" },
+    { "id": "m016", "usAccount": "520000", "frAccount": "625",  "beAccount": "",     "type": "Expense",                 "description": "Travel and accommodation expenses",         "module": "general_ledger" },
+    { "id": "m017", "usAccount": "530000", "frAccount": "2158", "beAccount": "221",  "type": "Asset",                   "description": "Other tangible fixed assets",               "module": "fixed_assets" }
   ]
 }

@@ -49,9 +49,10 @@ function detectColumns(sampleRow) {
     // Core
     voucher:          find('voucher','bon','piece','pièce','document','docnum','doc'),
     date:             find('date','postingdate','postdate','valuedate'),
-    // Dual-GAAP accounts (checked before single-account fallback)
+    // Triple-GAAP accounts (US + FR + BE)
     us_account:       find('us_account','usaccount','usgaap','us account','us gl','usgl'),
     fr_account:       find('fr_account','fraccount','frgaap','fr account','pcg account','frpcg','french account','frenchaccount'),
+    be_account:       find('be_account','beaccount','begaap','be account','pcmn account','bepcmn','belgian account','belgianaccount','belgiumaccount'),
     // Single-account fallback
     account:          find('account','compte','mainaccount','ledgeraccount','gl','glaccount'),
     // Entry data
@@ -85,24 +86,27 @@ function normaliseEntry(row, colMap) {
     if (amt >= 0) debit = amt; else credit = Math.abs(amt);
   }
 
-  // Dual-GAAP: US_Account + FR_Account columns take precedence
+  // Triple-GAAP: US_Account + FR_Account + BE_Account columns take precedence
   const usRaw = String(getField(row, colMap.us_account) || '').replace(/\s/g, '').trim();
   const frRaw = String(getField(row, colMap.fr_account) || '').replace(/\s/g, '').trim();
+  const beRaw = String(getField(row, colMap.be_account) || '').replace(/\s/g, '').trim();
   // Fallback: legacy single account column
   const legacyAccount = String(getField(row, colMap.account) || '').replace(/\s/g, '').trim();
 
   // `account` field is the US account for backwards-compatibility (diagnostic engine uses it)
   const usAccount = usRaw || legacyAccount;
   const frAccount = frRaw;
+  const beAccount = beRaw;
 
   const exchangeRate = parseNum(getField(row, colMap.exchangerate));
 
   return {
     voucher:          String(getField(row, colMap.voucher)).trim(),
     date:             normaliseDate(getField(row, colMap.date)),
-    // Dual-GAAP
+    // Triple-GAAP
     usAccount,
     frAccount,
+    beAccount,
     // Legacy compat
     account:          usAccount,
     description:      String(getField(row, colMap.description)).trim(),
@@ -174,7 +178,8 @@ function groupByVoucher(entries) {
 function calcStats(entries) {
   const totalDebit  = entries.reduce((s, e) => s + e.debit,  0);
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0);
-  const isDualGaap  = entries.some(e => e.frAccount && e.frAccount !== '');
+  const isDualGaap   = entries.some(e => e.frAccount && e.frAccount !== '');
+  const isTripleGaap = entries.some(e => e.beAccount && e.beAccount !== '');
   return {
     totalEntries:   entries.length,
     totalDebit:     Math.round(totalDebit  * 100) / 100,
@@ -183,6 +188,7 @@ function calcStats(entries) {
     uniqueAccounts: new Set(entries.map(e => e.usAccount || e.account)).size,
     isBalanced:     Math.abs(totalDebit - totalCredit) < 0.01,
     isDualGaap,
+    isTripleGaap,
   };
 }
 
