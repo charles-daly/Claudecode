@@ -17,4 +17,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   gaapImportPreview:    ()              => ipcRenderer.invoke('gaap:importPreview'),
   gaapImportApply:      (rows, opts)    => ipcRenderer.invoke('gaap:importApply', rows, opts),
   gaapExportMappings:   ()              => ipcRenderer.invoke('gaap:exportMappings'),
+  suggestFixes:         (result, ctx)   => ipcRenderer.invoke('engine:suggestFixes', result, ctx),
+  runSimulation:        (data, ctx, mod)=> ipcRenderer.invoke('engine:runSimulation', data, ctx, mod),
+  buildFinancials:      (data)          => ipcRenderer.invoke('engine:buildFinancials', data),
+  analysePatterns:      (result)        => ipcRenderer.invoke('engine:analysePatterns', result),
+  testlabTemplates:     ()              => ipcRenderer.invoke('testlab:getTemplates'),
+  testlabGenerate:      (config)        => ipcRenderer.invoke('testlab:generateCase', config),
+  testlabRun:           (testCase)      => ipcRenderer.invoke('testlab:runCase', testCase),
+  testlabExport:        (tc, res)       => ipcRenderer.invoke('testlab:exportResults', tc, res),
 });

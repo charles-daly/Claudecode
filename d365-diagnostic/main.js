@@ -288,6 +288,94 @@ ipcMain.handle('gaap:exportMappings', async () => {
   }
 });
 
+// ─── IPC: Suggest fixes ───────────────────────────────────────
+ipcMain.handle('engine:suggestFixes', async (_event, result, context) => {
+  try {
+    const { suggestFixesForResult } = require('./src/engine/correctionEngine');
+    return suggestFixesForResult(result, context || {});
+  } catch (err) {
+    return { fixes: [], groups: {}, summary: {}, error: err.message };
+  }
+});
+
+// ─── IPC: Run simulation ──────────────────────────────────────
+ipcMain.handle('engine:runSimulation', async (_event, parsedData, context, modifications) => {
+  try {
+    const { runSimulation } = require('./src/engine/simulationEngine');
+    return runSimulation(parsedData, context || {}, modifications || {});
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ─── IPC: Build financial statements ─────────────────────────
+ipcMain.handle('engine:buildFinancials', async (_event, voucherData) => {
+  try {
+    const { buildAllStatements } = require('./src/engine/financialStatementEngine');
+    return buildAllStatements(voucherData);
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+// ─── IPC: Analyse patterns ────────────────────────────────────
+ipcMain.handle('engine:analysePatterns', async (_event, diagnosticResult) => {
+  try {
+    const { analysePatterns } = require('./src/engine/patternEngine');
+    return analysePatterns(diagnosticResult);
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+// ─── IPC: Test Lab — get templates ───────────────────────────
+ipcMain.handle('testlab:getTemplates', async () => {
+  try {
+    const { getTemplates } = require('./src/engine/testLabEngine');
+    return getTemplates();
+  } catch (err) {
+    return [];
+  }
+});
+
+// ─── IPC: Test Lab — generate test case ──────────────────────
+ipcMain.handle('testlab:generateCase', async (_event, config) => {
+  try {
+    const { generateTestCase } = require('./src/engine/testLabEngine');
+    return generateTestCase(config);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// ─── IPC: Test Lab — run test case ───────────────────────────
+ipcMain.handle('testlab:runCase', async (_event, testCase) => {
+  try {
+    const { runTestCase } = require('./src/engine/testLabEngine');
+    return runTestCase(testCase);
+  } catch (err) {
+    return { success: false, passed: false, error: err.message };
+  }
+});
+
+// ─── IPC: Test Lab — export results ──────────────────────────
+ipcMain.handle('testlab:exportResults', async (_event, testCase, testResult) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export Test Results',
+    defaultPath: `TestLab_${(testCase?.id || 'result')}_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    filters: [{ name: 'Excel Files', extensions: ['xlsx'] }],
+  });
+
+  if (result.canceled) return { success: false, canceled: true };
+
+  try {
+    const { exportTestResults } = require('./src/engine/testLabEngine');
+    return exportTestResults(testCase, testResult, result.filePath);
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

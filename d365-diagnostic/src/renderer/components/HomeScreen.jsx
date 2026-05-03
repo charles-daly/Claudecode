@@ -2,7 +2,7 @@ import React from 'react';
 
 const SEV_COLOR = { critical: '#ef4444', error: '#f97316', warning: '#f59e0b', clean: '#22c55e' };
 
-export default function HomeScreen({ onAnalyze, onScenario, onConfig, hasData, hasResult, result, onViewResults }) {
+export default function HomeScreen({ onAnalyze, onScenario, onConfig, onFix, onSimulate, onFinancials, onTestlab, hasData, hasResult, result, onViewResults }) {
   const summary = result?.summary;
   const statusColor = summary ? (SEV_COLOR[summary.overallStatus] || '#22c55e') : null;
 
@@ -80,6 +80,17 @@ export default function HomeScreen({ onAnalyze, onScenario, onConfig, hasData, h
         />
       </div>
 
+      {/* Professional Tools */}
+      <div style={{ marginBottom: 48 }}>
+        <div style={S.sectionLabel}>Professional Tools</div>
+        <div style={S.proCards}>
+          <ProCard icon="🔧" title="Fix Issues" description="Corrective journals, D365 actions, and GL/subledger guidance per issue." color="#f97316" onClick={onFix} />
+          <ProCard icon="⚗️" title="Simulate" description="What-if: swap accounts, override rates, see before/after issue counts." color="#a78bfa" onClick={onSimulate} />
+          <ProCard icon="📊" title="Financials" description="P&L and Balance Sheet across US GAAP, French PCG, and Belgian PCMN." color="#34d399" onClick={onFinancials} />
+          <ProCard icon="🧪" title="Test Lab" description="Generate test scenarios, run assertions, and export results to Excel." color="#60a5fa" onClick={onTestlab} />
+        </div>
+      </div>
+
       {/* Quick start hints */}
       <div style={S.hints}>
         <div style={S.hintTitle}>Quick start</div>
@@ -146,6 +157,28 @@ function FlowCard({ icon, iconBg, iconColor, title, description, action, onClick
   );
 }
 
+function ProCard({ icon, title, description, color, onClick }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        flex: '1 1 180px', padding: '16px 18px', borderRadius: 10, cursor: 'pointer',
+        border: `1px solid ${hover ? color + '55' : '#1e293b'}`,
+        background: hover ? '#1a1f2e' : '#161b27',
+        transition: 'all .18s',
+        transform: hover ? 'translateY(-2px)' : 'none',
+      }}
+    >
+      <div style={{ fontSize: 22, marginBottom: 8 }}>{icon}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: color, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{description}</div>
+    </div>
+  );
+}
+
 function HintStep({ n, text }) {
   return (
     <div style={S.hintStep}>
@@ -168,6 +201,8 @@ const S = {
   statusDot:     { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
   viewResultsBtn: { padding: '8px 18px', background: '#1e293b', border: '1px solid #334155', borderRadius: 8, color: '#e2e8f0', fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 },
 
+  sectionLabel: { fontSize: 11, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 14 },
+  proCards: { display: 'flex', gap: 14, flexWrap: 'wrap' },
   cards:   { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginBottom: 48 },
   card:    { borderRadius: 14, padding: '24px', transition: 'all .2s ease', userSelect: 'none' },
   iconBox: { width: 52, height: 52, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },

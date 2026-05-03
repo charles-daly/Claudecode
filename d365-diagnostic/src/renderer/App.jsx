@@ -1,8 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import HomeScreen    from './components/HomeScreen';
-import AnalyzeFlow   from './components/AnalyzeFlow';
-import ScenarioView  from './components/ScenarioView';
-import ConfigCenter  from './components/ConfigCenter';
+import HomeScreen      from './components/HomeScreen';
+import AnalyzeFlow     from './components/AnalyzeFlow';
+import ScenarioView    from './components/ScenarioView';
+import ConfigCenter    from './components/ConfigCenter';
+import FixIssuesView   from './components/FixIssuesView';
+import SimulationView  from './components/SimulationView';
+import FinancialsView  from './components/FinancialsView';
+import TestLabView     from './components/TestLabView';
 
 const DEFAULT_CONTEXT = {
   module: 'lease', country: 'FR', gaap: 'french_gaap', pma: false,
@@ -211,6 +215,10 @@ export default function App() {
             onAnalyze={() => goTo('analyze')}
             onScenario={() => goTo('scenario')}
             onConfig={() => goTo('config')}
+            onFix={() => goTo('fix')}
+            onSimulate={() => goTo('simulate')}
+            onFinancials={() => goTo('financials')}
+            onTestlab={() => goTo('testlab')}
             hasData={!!importedData}
             hasResult={!!diagnosticResult}
             result={diagnosticResult}
@@ -240,6 +248,18 @@ export default function App() {
         {flow === 'config' && (
           <ConfigCenter context={context} setContext={setContext} mode={mode} />
         )}
+        {flow === 'fix' && (
+          <FixIssuesView result={diagnosticResult} context={context} />
+        )}
+        {flow === 'simulate' && (
+          <SimulationView parsedData={importedData} context={context} />
+        )}
+        {flow === 'financials' && (
+          <FinancialsView voucherData={importedData} />
+        )}
+        {flow === 'testlab' && (
+          <TestLabView />
+        )}
       </main>
     </div>
   );
@@ -253,7 +273,10 @@ function AppHeader({ flow, mode, toggleMode, onHome, summary }) {
     summary?.overallStatus === 'warning'  ? '#f59e0b' :
     summary                               ? '#22c55e' : null;
 
-  const FLOW_LABELS = { analyze: 'Analyze Vouchers', scenario: 'Build Scenario', config: 'Configuration' };
+  const FLOW_LABELS = {
+    analyze: 'Analyze Vouchers', scenario: 'Build Scenario', config: 'Configuration',
+    fix: 'Fix Issues', simulate: 'Simulate', financials: 'Financials', testlab: 'Test Lab',
+  };
 
   return (
     <header style={S.header}>
