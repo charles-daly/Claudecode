@@ -300,12 +300,34 @@ function calculateConfidence(issue) {
 // ─── Main: suggest fix for one issue ─────────────────────────────────────────
 
 function suggestFix(issue, context) {
-  const correctionType = classifyCorrection(issue, context);
-  const glJournal      = correctionType !== 'PROJECT_SUBLEDGER' ? generateGLJournal(issue, context) : null;
-  const subledger      = correctionType !== 'GL_ONLY'           ? generateSubledgerAction(issue, context) : null;
-  const configAction   = correctionType === 'CONFIG_ONLY'       ? generateConfigAction(issue) : null;
-  const businessImpact = generateBusinessImpact(issue, correctionType);
-  const confidence     = calculateConfidence(issue);
+  // Pre-validate — return partial result on blockers, never throw
+  const validation = preValidate(issue, context);
+  if (!validation.valid) {
+    return {
+      issueType:       issue?.type || 'UNKNOWN',
+      severity:        issue?.severity || 'unknown',
+      voucherId:       issue?.voucherId || null,
+      correctionType:  'UNKNOWN',
+      glJournal:       null,
+      subledger:       null,
+      configAction:    null,
+      businessImpact:  null,
+      confidence:      0,
+      canAutoGenerate: false,
+      existingFix:     issue?.fix || null,
+      validationError: validation.blockers,
+      validationWarnings: validation.warnings,
+      partial: true,
+    };
+  }
+
+  let correctionType, glJournal, subledger, configAction, businessImpact, confidence;
+  try { correctionType = classifyCorrection(issue, context); } catch { correctionType = 'GL_ONLY'; }
+  try { glJournal      = correctionType !== 'PROJECT_SUBLEDGER' ? generateGLJournal(issue, context) : null; } catch { glJournal = null; }
+  try { subledger      = correctionType !== 'GL_ONLY' ? generateSubledgerAction(issue, context) : null; } catch { subledger = null; }
+  try { configAction   = correctionType === 'CONFIG_ONLY' ? generateConfigAction(issue) : null; } catch { configAction = null; }
+  try { businessImpact = generateBusinessImpact(issue, correctionType); } catch { businessImpact = { description: 'Impact analysis unavailable.', priority: 'Routine' }; }
+  try { confidence     = calculateConfidence(issue); } catch { confidence = 0.5; }
 
   return {
     issueType:      issue.type,
@@ -319,34 +341,41 @@ function suggestFix(issue, context) {
     confidence,
     canAutoGenerate: Boolean(glJournal || configAction),
     existingFix:    issue.fix || null,
+    validationWarnings: validation.warnings.length > 0 ? validation.warnings : undefined,
+    partial: false,
   };
 }
 
 // ─── Bulk: suggest fixes for all issues in a diagnostic result ───────────────
 
 function suggestFixesForResult(diagnosticResult, context) {
+  if (!diagnosticResult) {
+    return { fixes: [], groups: [], summary: { total: 0, glOnly: 0, subledger: 0, hybrid: 0, configOnly: 0, highConf: 0 }, error: 'No diagnostic result provided' };
+  }
+
   const issues = [];
-
-  if (diagnosticResult.voucherAnalysis) {
-    Object.entries(diagnosticResult.voucherAnalysis).forEach(([sheet, data]) => {
-      (data.vouchers || []).forEach(v =>
-        (v.issues || []).forEach(iss => issues.push({ ...iss, sheet }))
+  try {
+    if (diagnosticResult.voucherAnalysis) {
+      Object.entries(diagnosticResult.voucherAnalysis).forEach(([sheet, data]) => {
+        (data.vouchers || []).forEach(v =>
+          (v.issues || []).forEach(iss => issues.push({ ...iss, sheet }))
+        );
+      });
+    }
+    if (diagnosticResult.scenarioAnalysis) {
+      (diagnosticResult.scenarioAnalysis.findings || []).forEach(f =>
+        (f.issues || []).forEach(iss => issues.push({ ...iss, scenarioId: f.id }))
       );
-    });
+    }
+  } catch (e) {
+    return { fixes: [], groups: [], summary: { total: 0, glOnly: 0, subledger: 0, hybrid: 0, configOnly: 0, highConf: 0 }, error: `Failed to collect issues: ${e.message}` };
   }
 
-  if (diagnosticResult.scenarioAnalysis) {
-    (diagnosticResult.scenarioAnalysis.findings || []).forEach(f =>
-      (f.issues || []).forEach(iss => issues.push({ ...iss, scenarioId: f.id }))
-    );
-  }
+  const fixes = issues.map(iss => { try { return suggestFix(iss, context); } catch { return null; } }).filter(Boolean);
 
-  const fixes = issues.map(iss => suggestFix(iss, context));
-
-  // Deduplicate: group by type + account for "apply to all similar"
   const groups = {};
   fixes.forEach((fix, i) => {
-    const key = `${fix.issueType}::${issues[i].account || issues[i].usAccount || ''}`;
+    const key = `${fix.issueType}::${issues[i]?.account || issues[i]?.usAccount || ''}`;
     if (!groups[key]) groups[key] = { key, issueType: fix.issueType, count: 0, fixes: [] };
     groups[key].count++;
     groups[key].fixes.push(fix);
@@ -362,11 +391,65 @@ function suggestFixesForResult(diagnosticResult, context) {
       hybrid:      fixes.filter(f => f.correctionType === 'HYBRID').length,
       configOnly:  fixes.filter(f => f.correctionType === 'CONFIG_ONLY').length,
       highConf:    fixes.filter(f => f.confidence >= 0.85).length,
+      partial:     fixes.filter(f => f.partial).length,
     },
   };
 }
 
+// ─── Pre-validation ───────────────────────────────────────────────────────────
+
+/**
+ * Validates an issue object before attempting to generate a correction.
+ * Returns { valid, blockers, warnings } — never throws.
+ */
+function preValidate(issue, context) {
+  if (!issue || typeof issue !== 'object') {
+    return {
+      valid: false,
+      blockers: [{ field: 'issue', message: 'No issue object provided', fix: 'Pass a valid issue from the diagnostic result' }],
+      warnings: [],
+    };
+  }
+
+  const blockers = [];
+  const warnings = [];
+
+  // Account check
+  const account = issue.usAccount || issue.account;
+  if (!account && !['UNBALANCED_VOUCHER', 'MISSING_ENTRY'].includes(issue.type)) {
+    blockers.push({
+      field: 'account',
+      message: 'Issue has no account reference',
+      fix: 'Verify the diagnostic engine returned the correct issue structure',
+    });
+  }
+
+  // Amount check
+  if (issue.amount !== undefined && issue.amount !== null) {
+    if (typeof issue.amount === 'number' && isNaN(issue.amount)) {
+      blockers.push({ field: 'amount', message: 'Amount is NaN — cannot generate a journal', fix: 'Check source entry for numeric debit/credit values' });
+    } else if (typeof issue.amount === 'number' && issue.amount < 0) {
+      warnings.push({ field: 'amount', message: `Amount is negative (${issue.amount}) — journal signs will be reversed automatically` });
+    }
+  }
+
+  // Type check
+  if (!issue.type) {
+    blockers.push({ field: 'type', message: 'Issue has no type field', fix: 'Run the diagnostic again — issue.type must be set' });
+  }
+
+  // Currency check
+  if (context?.accountingCurrency) {
+    const ccy = String(context.accountingCurrency).trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(ccy)) {
+      warnings.push({ field: 'currency', message: `Accounting currency '${ccy}' is not a standard 3-letter ISO code`, fix: 'Set accountingCurrency to e.g. EUR, USD, GBP' });
+    }
+  }
+
+  return { valid: blockers.length === 0, blockers, warnings };
+}
+
 module.exports = {
-  classifyCorrection, suggestFix, suggestFixesForResult,
+  preValidate, classifyCorrection, suggestFix, suggestFixesForResult,
   generateGLJournal, generateSubledgerAction, generateConfigAction, generateBusinessImpact,
 };

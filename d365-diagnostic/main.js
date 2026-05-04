@@ -136,6 +136,25 @@ ipcMain.handle('data:loadSample', async () => {
   }
 });
 
+// ─── IPC: Download import template ───────────────────────────
+ipcMain.handle('data:downloadTemplate', async () => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save Import Template',
+    defaultPath: 'D365_Import_Template.xlsx',
+    filters: [{ name: 'Excel Files', extensions: ['xlsx'] }],
+  });
+
+  if (result.canceled) return { success: false, canceled: true };
+
+  try {
+    const { generateTemplateExcel } = require('./src/engine/excelParser');
+    generateTemplateExcel(result.filePath);
+    return { success: true, filePath: result.filePath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // ─── IPC: Generate sample Excel file ─────────────────────────
 ipcMain.handle('data:generateSampleExcel', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportWord:           (data)          => ipcRenderer.invoke('export:word', data),
   loadSampleData:       ()              => ipcRenderer.invoke('data:loadSample'),
   generateSampleExcel:  ()              => ipcRenderer.invoke('data:generateSampleExcel'),
+  downloadTemplate:     ()              => ipcRenderer.invoke('data:downloadTemplate'),
   showFile:             (path)          => ipcRenderer.invoke('shell:showFile', path),
   runTests:             ()              => ipcRenderer.invoke('engine:runTests'),
   getLogs:              (filter)        => ipcRenderer.invoke('engine:getLogs', filter),

@@ -310,4 +310,95 @@ function generateSampleExcel(outputPath) {
   return { classicRows, dualRows };
 }
 
-module.exports = { parseExcelFile, generateSampleExcel, groupByVoucher, calcStats };
+// ─── Generate blank import template with column guide ────────────────────────
+function generateTemplateExcel(outputPath) {
+  const XLSX = require('xlsx');
+  const wb   = XLSX.utils.book_new();
+
+  // Sheet 1 — Template with headers + 3 example rows
+  const templateRows = [
+    {
+      Voucher: 'ACC-2024-001',
+      Date: '2024-01-15',
+      US_Account: '110000',
+      FR_Account: '411',
+      BE_Account: '400',
+      Account: '',
+      Description: 'Trade receivable – Customer A',
+      Debit: 25000,
+      Credit: '',
+      Currency: 'USD',
+      ExchangeRate: 0.92,
+      TransactionType: 'Invoice',
+      Module: 'Sales',
+      Project: '',
+      Category: '',
+    },
+    {
+      Voucher: 'ACC-2024-001',
+      Date: '2024-01-15',
+      US_Account: '400200',
+      FR_Account: '701',
+      BE_Account: '700',
+      Account: '',
+      Description: 'Sales revenue',
+      Debit: '',
+      Credit: 25000,
+      Currency: 'USD',
+      ExchangeRate: 0.92,
+      TransactionType: 'Invoice',
+      Module: 'Sales',
+      Project: '',
+      Category: '',
+    },
+    {
+      Voucher: 'ACC-2024-002',
+      Date: '2024-01-31',
+      US_Account: '500100',
+      FR_Account: '607',
+      BE_Account: '604',
+      Account: '',
+      Description: 'Cost of goods sold',
+      Debit: 10000,
+      Credit: '',
+      Currency: 'EUR',
+      ExchangeRate: 1,
+      TransactionType: 'COGS',
+      Module: 'Procurement',
+      Project: '',
+      Category: '',
+    },
+  ];
+
+  const ws1 = XLSX.utils.json_to_sheet(templateRows);
+  ws1['!cols'] = [18,12,12,12,12,10,45,10,10,8,12,18,14,12,12].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Import Template');
+
+  // Sheet 2 — Column guide
+  const guideRows = [
+    { Column: 'Voucher',         Required: 'YES', Aliases: 'Bon, Piece, Document, DocNum, Doc',               Notes: 'Groups lines into a voucher/journal entry' },
+    { Column: 'Date',            Required: 'No',  Aliases: 'PostingDate, PostDate, ValueDate',                  Notes: 'DD/MM/YYYY or YYYY-MM-DD' },
+    { Column: 'US_Account',      Required: 'No*', Aliases: 'USAccount, USGAAP, US Account, US GL',              Notes: '* Required for triple-GAAP mode. US/IFRS GL account' },
+    { Column: 'FR_Account',      Required: 'No',  Aliases: 'FRAccount, FRGAAP, FR Account, PCG Account',        Notes: 'French Plan Comptable Général (PCG) account' },
+    { Column: 'BE_Account',      Required: 'No',  Aliases: 'BEAccount, BEGAAP, BE Account, PCMN Account',       Notes: 'Belgian Plan Comptable Minimum Normalisé (PCMN)' },
+    { Column: 'Account',         Required: 'No*', Aliases: 'Compte, MainAccount, LedgerAccount, GL',            Notes: '* Required if US_Account not present (legacy mode)' },
+    { Column: 'Description',     Required: 'No',  Aliases: 'Text, Libelle, Narration, Memo, Name',              Notes: 'Entry description / posting text' },
+    { Column: 'Debit',           Required: 'YES', Aliases: 'Débit, DR, AmountDR, DebitAmount',                  Notes: 'Debit amount (positive number or blank)' },
+    { Column: 'Credit',          Required: 'YES', Aliases: 'Crédit, CR, AmountCR, CreditAmount',                Notes: 'Credit amount (positive number or blank)' },
+    { Column: 'Amount',          Required: 'No',  Aliases: 'Montant, Amt, TransactionAmount',                   Notes: 'Signed amount — alternative to separate Debit/Credit columns' },
+    { Column: 'Currency',        Required: 'No',  Aliases: 'Devise, Cur, CurrencyCode',                         Notes: '3-letter ISO code (EUR, USD, GBP…). Defaults to EUR' },
+    { Column: 'ExchangeRate',    Required: 'No',  Aliases: 'Exchange_Rate, ExRate, FXRate, Rate, TauxChange',   Notes: 'Rate vs accounting currency. Defaults to 1.0' },
+    { Column: 'TransactionType', Required: 'No',  Aliases: 'Transaction_Type, TxType, Txn Type, Type',          Notes: 'Invoice, Payment, Accrual, COGS, WIP…' },
+    { Column: 'Module',          Required: 'No',  Aliases: 'Source, Origin, JournalType',                       Notes: 'gl, ap, ar, pma, sales, procurement, fixed_assets…' },
+    { Column: 'Project',         Required: 'No',  Aliases: 'ProjectID, Project_ID, ProjId, Proj',               Notes: 'Project ID for PMA / project module entries' },
+    { Column: 'Category',        Required: 'No',  Aliases: 'CategoryID, Category_ID, CatId',                    Notes: 'Cost category for project entries' },
+  ];
+
+  const ws2 = XLSX.utils.json_to_sheet(guideRows);
+  ws2['!cols'] = [18, 10, 50, 60].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws2, 'Column Guide');
+
+  XLSX.writeFile(wb, outputPath);
+}
+
+module.exports = { parseExcelFile, generateSampleExcel, generateTemplateExcel, groupByVoucher, calcStats };

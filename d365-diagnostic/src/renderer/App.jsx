@@ -258,7 +258,7 @@ export default function App() {
           <FinancialsView voucherData={importedData} />
         )}
         {flow === 'testlab' && (
-          <TestLabView />
+          <TestLabView importedData={importedData} />
         )}
       </main>
     </div>
