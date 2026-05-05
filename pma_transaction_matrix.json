@@ -1,0 +1,361 @@
+{
+  "module": "PMA Transaction Behavior Matrix",
+  "version": "1.0",
+  "generated": "2026-05-05",
+  "description": "Defines how each transaction type behaves for each project type in D365 PMA — what accounting result it produces, why, and what GL entries it creates.",
+  "localization": "Global (no country-specific rules applied)",
+  "result_type_definitions": {
+    "Cost":    "Transaction debits a P&L expense account immediately on posting.",
+    "Revenue": "Transaction credits a P&L revenue account immediately (or on invoice).",
+    "WIP":     "Transaction debits a balance sheet WIP asset account; P&L is deferred until revenue recognition.",
+    "Accrual": "Transaction creates a balance sheet holding entry (asset or liability) that is matched, offset, or reversed in a later step."
+  },
+  "matrix": [
+    {
+      "project_type": "Time and Material",
+      "code": "T&M",
+      "logic_summary": "T&M projects bill for actual work performed. Every cost incurred is billable, so costs and revenue move in lockstep. No deferred WIP is needed — the matching principle is satisfied within the same period. Costs post to P&L on the transaction date; revenue posts on invoicing.",
+      "transactions": [
+        {
+          "id": "TM-HR",
+          "transaction_type": "Hour",
+          "result_type": "Cost",
+          "lifecycle_phases": ["Cost on posting", "Revenue on invoice"],
+          "explanation": "Hour journals post labour cost directly to the P&L expense account as soon as they are approved. When the customer invoice is raised, a matching revenue line is created. Cost and revenue land in the same period because T&M invoicing is typically immediate.",
+          "accounting_impact": "Cost recognised at worker cost price; revenue recognised at agreed billing rate. Gross margin visible on the project as soon as the invoice posts.",
+          "example_journal": {
+            "phase_1_cost_posting": {
+              "trigger": "Hour journal approved — 8 hrs at $75 cost price = $600",
+              "entries": [
+                { "account": "Project Labour Cost (P&L)", "direction": "Dr", "amount": 600 },
+                { "account": "Accrued Labour Cost (BS)",  "direction": "Cr", "amount": 600 }
+              ]
+            },
+            "phase_2_invoice": {
+              "trigger": "Customer invoice posted — 8 hrs at $125 billing rate = $1,000",
+              "entries": [
+                { "account": "Accounts Receivable (BS)", "direction": "Dr", "amount": 1000 },
+                { "account": "Project Revenue (P&L)",    "direction": "Cr", "amount": 1000 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "TM-EX",
+          "transaction_type": "Expense",
+          "result_type": "Cost",
+          "lifecycle_phases": ["Cost on posting", "Revenue on invoice"],
+          "explanation": "Expense transactions (travel, accommodation, materials expensed) follow the same two-phase pattern as hours. The cost posts at actual amount; the invoice to the customer typically applies a markup.",
+          "accounting_impact": "Actual expense cost hits P&L immediately. Revenue from the recharge posts on invoicing. Any markup becomes project gross margin.",
+          "example_journal": {
+            "phase_1_cost_posting": {
+              "trigger": "Expense report approved — hotel $800",
+              "entries": [
+                { "account": "Project Expense Cost (P&L)",  "direction": "Dr", "amount": 800 },
+                { "account": "Accrued Expenses Payable (BS)", "direction": "Cr", "amount": 800 }
+              ]
+            },
+            "phase_2_invoice": {
+              "trigger": "Customer invoice posted — $800 recharged at cost",
+              "entries": [
+                { "account": "Accounts Receivable (BS)", "direction": "Dr", "amount": 800 },
+                { "account": "Project Revenue (P&L)",    "direction": "Cr", "amount": 800 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "TM-IT",
+          "transaction_type": "Item",
+          "result_type": "Cost",
+          "lifecycle_phases": ["Cost on posting (inventory relief)", "Revenue on invoice"],
+          "explanation": "Item transactions consume physical inventory against the project. Inventory is relieved at cost price (FIFO/average/standard depending on inventory model). The credit leg removes the item from stock; the debit leg charges project cost.",
+          "accounting_impact": "Inventory balance reduces; project cost increases on the P&L. Revenue from billing the item to the customer posts at invoice time at the agreed sales price.",
+          "example_journal": {
+            "phase_1_cost_posting": {
+              "trigger": "Item consumed from warehouse — 10 units at $50 standard cost = $500",
+              "entries": [
+                { "account": "Project Material Cost (P&L)", "direction": "Dr", "amount": 500 },
+                { "account": "Inventory (BS)",              "direction": "Cr", "amount": 500 }
+              ]
+            },
+            "phase_2_invoice": {
+              "trigger": "Customer invoice posted — 10 units at $80 sales price = $800",
+              "entries": [
+                { "account": "Accounts Receivable (BS)", "direction": "Dr", "amount": 800 },
+                { "account": "Project Revenue (P&L)",    "direction": "Cr", "amount": 800 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "TM-FE",
+          "transaction_type": "Fee",
+          "result_type": "Revenue",
+          "lifecycle_phases": ["Revenue on invoice (no cost counterpart)"],
+          "explanation": "Fee transactions are pure revenue lines with no cost side — used for fixed charges, setup fees, or retainers billed on a T&M project. The entire invoice amount flows directly to revenue.",
+          "accounting_impact": "100% of the fee amount becomes project revenue. No cost is recorded in PMA. Any underlying cost (e.g. account management overhead) is tracked separately, not through the project.",
+          "example_journal": {
+            "phase_1_invoice": {
+              "trigger": "Project management fee invoice posted — $2,000",
+              "entries": [
+                { "account": "Accounts Receivable (BS)", "direction": "Dr", "amount": 2000 },
+                { "account": "Project Revenue (P&L)",    "direction": "Cr", "amount": 2000 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "TM-OA",
+          "transaction_type": "On-account",
+          "result_type": "Accrual",
+          "lifecycle_phases": ["Advance billing creates BS liability", "Matched against transactions on final invoice"],
+          "explanation": "On-account transactions on T&M projects represent advance or milestone payments billed before the full scope is delivered. The amount sits as a deferred liability on the balance sheet until it is matched against actual billable transactions and a final invoice is confirmed.",
+          "accounting_impact": "No P&L impact at billing time. The on-account balance offsets future revenue lines at the point of matching. Net revenue is only recognised when the on-account is consumed by real transaction invoicing.",
+          "example_journal": {
+            "phase_1_advance_billing": {
+              "trigger": "Advance invoice raised — $5,000 deposit",
+              "entries": [
+                { "account": "Accounts Receivable (BS)",      "direction": "Dr", "amount": 5000 },
+                { "account": "On-Account Deduction (BS)",     "direction": "Cr", "amount": 5000 }
+              ]
+            },
+            "phase_2_matching_on_final_invoice": {
+              "trigger": "Final invoice confirmed; on-account matched against $5,000 of hours/expenses",
+              "entries": [
+                { "account": "On-Account Deduction (BS)", "direction": "Dr", "amount": 5000 },
+                { "account": "Project Revenue (P&L)",     "direction": "Cr", "amount": 5000 }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "project_type": "Fixed Price",
+      "code": "FP",
+      "logic_summary": "Fixed-price contracts have a known total contract value. Costs cannot be matched to revenue on a transaction-by-transaction basis because the revenue is only earned as the project progresses toward completion. To prevent P&L distortion, all costs accumulate in a WIP asset on the balance sheet. Revenue is recognised separately via a periodic estimate run that calculates how much of the contract value has been earned. WIP and revenue are then matched at period-end.",
+      "transactions": [
+        {
+          "id": "FP-HR",
+          "transaction_type": "Hour",
+          "result_type": "WIP",
+          "lifecycle_phases": ["Cost to WIP on posting", "WIP to COGS + Revenue on estimate run"],
+          "explanation": "Labour hours on a fixed-price project do not hit the P&L when posted. Instead, the cost accumulates in the WIP Cost Value account on the balance sheet. At period-end, an estimate run calculates percentage completion and simultaneously recognises both revenue (via accrued revenue) and transfers WIP to COGS.",
+          "accounting_impact": "Balance sheet grows during execution (Dr WIP). P&L impact is deferred until the estimate run, at which point COGS and Revenue are recognised in the same journal — preserving the matching principle.",
+          "example_journal": {
+            "phase_1_cost_to_wip": {
+              "trigger": "Hour journal approved — 10 hrs at $75 = $750",
+              "entries": [
+                { "account": "WIP — Cost Value (BS)",    "direction": "Dr", "amount": 750 },
+                { "account": "Accrued Labour Cost (BS)", "direction": "Cr", "amount": 750 }
+              ]
+            },
+            "phase_2_estimate_run": {
+              "trigger": "Month-end estimate run — project 60% complete; contract $50,000; total budget cost $30,000; cost-to-date $18,000",
+              "entries": [
+                { "account": "Accrued Revenue — Sales Value (BS)", "direction": "Dr", "amount": 30000, "note": "60% × $50,000" },
+                { "account": "Recognised Revenue (P&L)",           "direction": "Cr", "amount": 30000 },
+                { "account": "Project Cost — COGS (P&L)",          "direction": "Dr", "amount": 18000 },
+                { "account": "WIP — Cost Value (BS)",              "direction": "Cr", "amount": 18000 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "FP-EX",
+          "transaction_type": "Expense",
+          "result_type": "WIP",
+          "lifecycle_phases": ["Cost to WIP on posting", "WIP to COGS on estimate run"],
+          "explanation": "Expense transactions on fixed-price projects follow identical WIP logic to hours. The expense amount builds the WIP balance rather than expensing directly. This ensures all project costs — regardless of type — are deferred together and released to COGS when revenue is recognised.",
+          "accounting_impact": "WIP asset on BS increases with each expense posting. COGS is only recognised at estimate time, proportional to the percentage of completion.",
+          "example_journal": {
+            "phase_1_cost_to_wip": {
+              "trigger": "Expense approved — site survey travel $1,200",
+              "entries": [
+                { "account": "WIP — Cost Value (BS)",       "direction": "Dr", "amount": 1200 },
+                { "account": "Accrued Expenses Payable (BS)", "direction": "Cr", "amount": 1200 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "FP-IT",
+          "transaction_type": "Item",
+          "result_type": "WIP",
+          "lifecycle_phases": ["Inventory relief to WIP on posting", "WIP to COGS on estimate run"],
+          "explanation": "Items consumed on a fixed-price project relieve inventory and load the cost into WIP — not the P&L. This ensures the inventory balance sheet movement is matched with revenue recognition rather than the physical consumption event.",
+          "accounting_impact": "Inventory decreases immediately; WIP increases by the same amount. No P&L impact until the estimate run transfers WIP to COGS.",
+          "example_journal": {
+            "phase_1_inventory_to_wip": {
+              "trigger": "Materials issued to project — $3,500 at standard cost",
+              "entries": [
+                { "account": "WIP — Cost Value (BS)", "direction": "Dr", "amount": 3500 },
+                { "account": "Inventory (BS)",        "direction": "Cr", "amount": 3500 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "FP-FE",
+          "transaction_type": "Fee",
+          "result_type": "Accrual",
+          "lifecycle_phases": ["Fee increases contract value", "Revenue recognised via estimate run"],
+          "explanation": "Fee transactions on fixed-price projects add to the contract revenue pool. They do not generate a direct P&L posting. Instead, the fee amount is included in the total contract value used by the estimate engine to calculate earned revenue. Revenue is recognised via the normal estimate run.",
+          "accounting_impact": "No immediate GL impact from the fee transaction itself. Revenue flows through the estimate: accrued revenue BS account is debited and recognised revenue P&L is credited at the estimate posting date.",
+          "example_journal": {
+            "phase_1_estimate_run_including_fee": {
+              "trigger": "Estimate run after fee added to contract — incremental revenue from fee = $4,000",
+              "entries": [
+                { "account": "Accrued Revenue (BS)",      "direction": "Dr", "amount": 4000 },
+                { "account": "Recognised Revenue (P&L)", "direction": "Cr", "amount": 4000 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "FP-OA",
+          "transaction_type": "On-account",
+          "result_type": "Accrual",
+          "lifecycle_phases": ["Milestone invoice to BS liability", "Offset against accrued revenue at project close"],
+          "explanation": "On-account transactions on fixed-price projects represent milestone billing (e.g. 30% on kick-off, 40% at delivery). The invoice creates a balance sheet liability — it does not recognise revenue. Revenue is recognised independently by the estimate engine. The on-account balance is deducted from the accrued revenue asset when the project is eliminated.",
+          "accounting_impact": "Two BS balances co-exist: Accrued Revenue (asset, from estimate) and On-Account Deduction (liability, from billing). The net position shows whether the project is over- or under-billed. At project elimination both reverse and the true P&L result is confirmed.",
+          "example_journal": {
+            "phase_1_milestone_invoice": {
+              "trigger": "30% milestone invoice raised — $30,000 on a $100,000 contract",
+              "entries": [
+                { "account": "Accounts Receivable (BS)",  "direction": "Dr", "amount": 30000 },
+                { "account": "On-Account Deduction (BS)", "direction": "Cr", "amount": 30000 }
+              ]
+            },
+            "phase_2_estimate_run_same_period": {
+              "trigger": "Estimate confirms 30% complete — $30,000 revenue earned",
+              "entries": [
+                { "account": "Accrued Revenue (BS)",      "direction": "Dr", "amount": 30000 },
+                { "account": "Recognised Revenue (P&L)", "direction": "Cr", "amount": 30000 }
+              ],
+              "note": "Accrued Revenue (Dr $30k) nets to zero against On-Account Deduction (Cr $30k) — correctly billed project"
+            },
+            "phase_3_project_elimination": {
+              "trigger": "Project completed and closed — estimate eliminated",
+              "entries": [
+                { "account": "On-Account Deduction (BS)", "direction": "Dr", "amount": 30000 },
+                { "account": "Accrued Revenue (BS)",      "direction": "Cr", "amount": 30000 }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "project_type": "Internal",
+      "code": "INT",
+      "logic_summary": "Internal projects track costs for internal activities — R&D, overhead allocation, IT infrastructure, or capital investment. There is no customer and therefore no revenue recognition or billing. Costs post directly to the P&L as overhead or, for Investment project sub-types, to a capital WIP account pending asset capitalisation. Fee and On-account transaction types are not applicable.",
+      "transactions": [
+        {
+          "id": "INT-HR",
+          "transaction_type": "Hour",
+          "result_type": "Cost",
+          "lifecycle_phases": ["Cost to P&L (overhead) on posting"],
+          "explanation": "Labour posted to an internal project records the cost of internal resource consumption. The debit goes to an overhead or internal cost P&L account. No revenue is recognised. For Investment sub-type projects, the debit may go to a Capital WIP BS account pending fixed asset creation.",
+          "accounting_impact": "Overhead cost increases on the P&L immediately. Useful for internal cost tracking, resource utilisation analysis, and departmental chargebacks.",
+          "example_journal": {
+            "phase_1_cost_posting": {
+              "trigger": "Developer logs 5 hrs on internal IT project — cost $375",
+              "entries": [
+                { "account": "Internal / Overhead Cost (P&L)", "direction": "Dr", "amount": 375 },
+                { "account": "Accrued Labour Cost (BS)",       "direction": "Cr", "amount": 375 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "INT-EX",
+          "transaction_type": "Expense",
+          "result_type": "Cost",
+          "lifecycle_phases": ["Cost to P&L on posting"],
+          "explanation": "Expenses incurred for internal activities post directly to overhead P&L. Common examples include training costs, internal events, and facilities charges tracked against an internal project for management reporting.",
+          "accounting_impact": "Overhead P&L increases. No balance sheet deferral. Suitable for discretionary spend tracking where immediate expense recognition is correct.",
+          "example_journal": {
+            "phase_1_cost_posting": {
+              "trigger": "Team training expense approved — $600",
+              "entries": [
+                { "account": "Internal / Overhead Cost (P&L)",  "direction": "Dr", "amount": 600 },
+                { "account": "Accrued Expenses Payable (BS)",   "direction": "Cr", "amount": 600 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "INT-IT",
+          "transaction_type": "Item",
+          "result_type": "Cost",
+          "lifecycle_phases": ["Inventory relief to P&L on posting", "OR to Capital WIP for Investment projects"],
+          "explanation": "Items issued to internal projects relieve inventory and charge internal cost. For standard internal projects the cost goes to P&L. For Investment-type sub-projects (e.g. building an asset), the cost goes to a Capital WIP account on the BS and is eventually capitalised as a fixed asset.",
+          "accounting_impact": "Standard Internal: P&L charge immediately. Investment sub-type: BS Capital WIP builds up until the asset is placed in service, then transferred to Fixed Assets and depreciated.",
+          "example_journal": {
+            "phase_1_standard_internal": {
+              "trigger": "Office supplies issued from warehouse to internal project — $150",
+              "entries": [
+                { "account": "Internal Cost (P&L)", "direction": "Dr", "amount": 150 },
+                { "account": "Inventory (BS)",      "direction": "Cr", "amount": 150 }
+              ]
+            },
+            "phase_1_investment_subtype": {
+              "trigger": "Server components issued to capital project — $8,000",
+              "entries": [
+                { "account": "Capital WIP (BS)", "direction": "Dr", "amount": 8000 },
+                { "account": "Inventory (BS)",   "direction": "Cr", "amount": 8000 }
+              ]
+            }
+          }
+        },
+        {
+          "id": "INT-FE",
+          "transaction_type": "Fee",
+          "result_type": "Not Applicable",
+          "lifecycle_phases": [],
+          "explanation": "Fee transactions represent charges billed to an external customer. Internal projects have no customer, so Fee transactions are not applicable. The system typically restricts or ignores fee lines on Internal project types.",
+          "accounting_impact": "No GL impact. If a fee is accidentally created, it will not generate an invoice proposal because no customer is attached to the project.",
+          "example_journal": null
+        },
+        {
+          "id": "INT-OA",
+          "transaction_type": "On-account",
+          "result_type": "Not Applicable",
+          "lifecycle_phases": [],
+          "explanation": "On-account billing requires a customer contract and an external invoice. Internal projects have neither. This transaction type is not applicable and is blocked by the system for Internal project types.",
+          "accounting_impact": "No GL impact. Internal project funding (intercompany allocations or budget transfers) is handled outside the on-account mechanism.",
+          "example_journal": null
+        }
+      ]
+    }
+  ],
+  "logic_notes": {
+    "why_fixed_price_uses_wip": {
+      "principle": "Matching principle + contract liability accounting (IFRS 15 / ASC 606)",
+      "explanation": "On a fixed-price contract the revenue amount is fixed regardless of actual cost. Recognising costs to P&L as they are incurred — without simultaneously recognising matching revenue — would overstate losses in early periods and overstate profits at completion. WIP is a balance sheet holding account that parks costs until the estimate engine determines how much revenue has been earned. Cost and revenue are then released to P&L together via the estimate posting, preserving the matching principle across the contract duration.",
+      "key_implication": "The WIP balance is a measure of project investment. A growing WIP with no revenue recognition is a risk indicator — it may signal that the estimate method is not running or that the project is falling behind its % completion target."
+    },
+    "why_tm_posts_directly_to_pl": {
+      "principle": "Revenue earned as work is performed",
+      "explanation": "T&M contracts have no fixed price — every hour worked and expense incurred is billable at an agreed rate. Revenue is earned incrementally as the work is done. Because cost recognition and revenue recognition occur in the same period (and are causally linked), there is no timing mismatch to correct. Deferring T&M costs to WIP would create a spurious balance sheet asset with no revenue offset, which would be misleading. D365 therefore routes T&M costs straight to P&L, and revenue follows when the invoice is issued.",
+      "key_implication": "If a T&M project is not invoiced promptly, a period-end gap appears: costs on P&L with no matching revenue. This is an operational issue (billing lag), not an accounting design issue. The optional T&M WIP setting (PMA-009) can bridge this gap by deferring costs until the invoice is posted."
+    },
+    "how_on_account_behaves": {
+      "principle": "Advance billing ≠ revenue recognition",
+      "explanation": "On-account transactions exist to accommodate milestone or advance billing — the customer pays before the full scope is delivered. The cash received (or receivable created) cannot be recognised as revenue until the corresponding work is performed. D365 holds the on-account amount in a balance sheet liability (On-Account Deduction). On T&M projects, this is matched against billable transactions when the final invoice is confirmed. On Fixed-price projects, the on-account balance sits alongside the Accrued Revenue asset; the two offset each other, and the net position shows whether the project is over-billed (on-account > accrued revenue) or under-billed (accrued revenue > on-account).",
+      "over_billed_state": "On-Account Deduction (BS Cr) > Accrued Revenue (BS Dr) → customer has paid ahead of earned revenue → contract liability",
+      "under_billed_state": "Accrued Revenue (BS Dr) > On-Account Deduction (BS Cr) → revenue earned exceeds billing → contract asset (unbilled receivable)",
+      "key_implication": "Monitoring the net of these two BS accounts is the primary tool for assessing billing health on fixed-price projects at period-end."
+    }
+  },
+  "quick_reference": {
+    "headers": ["Project Type", "Hour", "Expense", "Item", "Fee", "On-account"],
+    "rows": [
+      ["Time and Material", "Cost → Revenue", "Cost → Revenue", "Cost → Revenue", "Revenue", "Accrual"],
+      ["Fixed Price",       "WIP",            "WIP",            "WIP",            "Accrual", "Accrual"],
+      ["Internal",          "Cost",           "Cost",           "Cost",           "N/A",     "N/A"]
+    ]
+  }
+}
