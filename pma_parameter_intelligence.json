@@ -1,0 +1,349 @@
+{
+  "module": "Project Management and Accounting",
+  "scope": "Parameters Page Only",
+  "navigation_root": "Project management and accounting > Setup > Project management and accounting parameters",
+  "version": "1.0",
+  "generated": "2026-05-05",
+  "localization": "Global (no country-specific rules applied)",
+  "parameters": [
+    {
+      "id": "PMA-001",
+      "name": "Post Costs",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > Post costs",
+      "field_name": "PostCosts",
+      "type": "Boolean",
+      "default": false,
+      "explanation": "Master switch that determines whether project cost transactions (hours, expenses, item consumption) generate general ledger entries. When OFF, costs are tracked only in the project subledger and never surface in the trial balance.",
+      "accounting_impact": "ON: every cost transaction creates a real GL posting. OFF: project costs exist only as statistical/subledger records and have zero P&L or BS impact until invoiced.",
+      "example_journal": {
+        "trigger": "Hour journal posted against a project (cost = $500)",
+        "entries": [
+          { "account": "Project Cost (P&L)",        "direction": "Dr", "amount": 500 },
+          { "account": "Accrued Costs Payable (BS)", "direction": "Cr", "amount": 500 }
+        ]
+      },
+      "dependencies": [
+        "Project posting profiles must have valid GL accounts before enabling",
+        "Affects all project types (Time & Material, Fixed-price, Investment)"
+      ]
+    },
+    {
+      "id": "PMA-002",
+      "name": "WIP — Cost Value Account",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > WIP — Cost value",
+      "field_name": "WIPCostValueLedgerAccountId",
+      "type": "Ledger Account (BS)",
+      "default": null,
+      "explanation": "Balance sheet account that accumulates the production cost of a fixed-price project as work progresses. Costs sit here until the project estimate is eliminated (project closed or revenue recognized), at which point they transfer to COGS.",
+      "accounting_impact": "Keeps costs off the P&L during project execution. Provides a BS-based view of project investment (WIP asset). Transfer to COGS matches revenue recognition timing.",
+      "example_journal": {
+        "trigger": "Estimate posted mid-project (accumulated cost = $20,000)",
+        "entries": [
+          { "account": "WIP — Cost Value (BS)",  "direction": "Dr", "amount": 20000 },
+          { "account": "Accrued Cost on Project (BS)", "direction": "Cr", "amount": 20000 }
+        ]
+      },
+      "dependencies": [
+        "PMA-001 Post Costs must be ON",
+        "Project type must be Fixed-price",
+        "Project group must have WIP posting enabled",
+        "Requires corresponding WIP elimination account at project completion"
+      ]
+    },
+    {
+      "id": "PMA-003",
+      "name": "Revenue Recognition — Estimate Method",
+      "tab": "General",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > General > Estimate method",
+      "field_name": "RevenueRecognitionMethod",
+      "type": "Enum",
+      "options": [
+        "Completed contract",
+        "Percentage of completion",
+        "Profit and loss",
+        "Sales value"
+      ],
+      "default": "Completed contract",
+      "explanation": "Controls the basis on which revenue is recognised for fixed-price projects. This is the highest-impact accounting policy decision in PMA — it drives when revenue appears on the P&L.",
+      "accounting_impact": {
+        "Completed contract": "Revenue deferred to BS until project is 100% complete. Zero P&L impact during execution.",
+        "Percentage of completion": "Revenue recognised proportionally as work is performed (% complete × contract value). Requires periodic estimate runs.",
+        "Profit and loss": "Revenue equals the amount invoiced/billed. Simple but can mismatch cost timing.",
+        "Sales value": "Revenue = costs incurred + a fixed margin percentage. Rare; used for cost-plus fixed-fee contracts."
+      },
+      "example_journal": {
+        "trigger": "Percentage of completion: 40% complete on a $100,000 contract; cost-to-date = $30,000",
+        "entries": [
+          { "account": "Accrued Revenue — Sales Value (BS)", "direction": "Dr", "amount": 40000 },
+          { "account": "Recognised Revenue (P&L)",           "direction": "Cr", "amount": 40000 },
+          { "account": "WIP — Cost Value (BS)",              "direction": "Dr", "amount": 30000 },
+          { "account": "Accrued Cost on Project (BS)",       "direction": "Cr", "amount": 30000 }
+        ]
+      },
+      "dependencies": [
+        "Applies to Fixed-price projects only",
+        "PMA-004 Post Revenue must be ON for GL entries to generate",
+        "PMA-006 Cost-to-Complete Method directly affects % complete calculation",
+        "Estimate must be run periodically (month-end) via Estimate project form"
+      ]
+    },
+    {
+      "id": "PMA-004",
+      "name": "Post Revenue",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > Post revenue",
+      "field_name": "PostRevenue",
+      "type": "Boolean",
+      "default": false,
+      "explanation": "Enables posting of recognised or accrued revenue to the general ledger. Without this, estimate calculations and % completion logic still run but no GL entry is created — revenue exists only as a project reporting figure.",
+      "accounting_impact": "ON: accrued/recognised revenue creates GL postings each estimate period. OFF: revenue visible on project analytics only; financial statements are unaffected until invoice.",
+      "example_journal": {
+        "trigger": "Monthly estimate run recognises $15,000 of revenue",
+        "entries": [
+          { "account": "Accrued Revenue (BS)",    "direction": "Dr", "amount": 15000 },
+          { "account": "Project Revenue (P&L)",   "direction": "Cr", "amount": 15000 }
+        ]
+      },
+      "dependencies": [
+        "PMA-003 Estimate Method determines the revenue amount",
+        "PMA-005 Accrued Revenue account must be configured",
+        "Only meaningful for Fixed-price projects running periodic estimates"
+      ]
+    },
+    {
+      "id": "PMA-005",
+      "name": "Accrued Revenue — Sales Value Account",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > Accrued revenue — Sales value",
+      "field_name": "AccruedRevenueSalesValueAccountId",
+      "type": "Ledger Account (BS)",
+      "default": null,
+      "explanation": "Balance sheet asset account that holds revenue earned but not yet invoiced to the customer (unbilled receivable / contract asset under IFRS 15 / ASC 606). Credited when the customer is eventually invoiced.",
+      "accounting_impact": "Creates a contract asset on the BS during project execution. Reverses to AR when invoice is raised. Ensures revenue recognition is decoupled from billing milestones.",
+      "example_journal": {
+        "trigger": "Invoice raised for $40,000 against an accrued revenue balance of $40,000",
+        "entries": [
+          { "account": "Accounts Receivable (BS)",            "direction": "Dr", "amount": 40000 },
+          { "account": "Accrued Revenue — Sales Value (BS)",  "direction": "Cr", "amount": 40000 }
+        ]
+      },
+      "dependencies": [
+        "PMA-004 Post Revenue must be ON",
+        "PMA-003 Estimate Method drives the accrual amount",
+        "Account should sit in Current Assets on the balance sheet"
+      ]
+    },
+    {
+      "id": "PMA-006",
+      "name": "Cost-to-Complete Method",
+      "tab": "General",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > General > Cost to complete method",
+      "field_name": "CostToCompleteMethod",
+      "type": "Enum",
+      "options": [
+        "Total cost entered",
+        "Remaining cost as entered",
+        "Zero remaining cost",
+        "Cost to complete as previous"
+      ],
+      "default": "Total cost entered",
+      "explanation": "Determines how the system calculates remaining costs when computing percentage of completion. This is a critical driver of revenue recognition amounts — changing it changes % complete and therefore recognised revenue.",
+      "accounting_impact": {
+        "Total cost entered": "% complete = Actual ÷ Budgeted total. Stable but requires accurate budgets.",
+        "Remaining cost as entered": "% complete = Actual ÷ (Actual + manually entered CTC). Flexible; requires project manager input each period.",
+        "Zero remaining cost": "System treats 100% of budget as used. Forces 100% completion — use only at project close.",
+        "Cost to complete as previous": "Rolls forward prior period CTC unchanged until manually updated."
+      },
+      "example_journal": {
+        "trigger": "Actual costs $60,000; total budget $100,000 → 60% complete; contract $150,000",
+        "entries": [
+          { "account": "Accrued Revenue (BS)",  "direction": "Dr", "amount": 90000 },
+          { "account": "Project Revenue (P&L)", "direction": "Cr", "amount": 90000 }
+        ],
+        "note": "Revenue = 60% × $150,000 = $90,000"
+      },
+      "dependencies": [
+        "PMA-003 must be set to Percentage of completion",
+        "Project budgets must be set (Original budget or Remaining budget lines)",
+        "Estimate run triggers the recalculation"
+      ]
+    },
+    {
+      "id": "PMA-007",
+      "name": "Ledger Accrual Scheme",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > Ledger accruals",
+      "field_name": "LedgerAccrualEnabled",
+      "type": "Boolean + Accrual Scheme reference",
+      "default": false,
+      "explanation": "When enabled, a single cost or revenue transaction is automatically spread across multiple accounting periods using an accrual schedule. Commonly used to defer subscription costs, prepaid expenses, or deferred revenue into the correct periods.",
+      "accounting_impact": "Prevents large one-time postings from distorting a single period. Creates a deferred balance on the BS that unwinds systematically.",
+      "example_journal": {
+        "trigger": "Software licence cost $12,000 posted in January; accrual spreads equally over 12 months ($1,000/month)",
+        "entries": [
+          { "account": "Deferred Cost (BS)",   "direction": "Dr", "amount": 12000 },
+          { "account": "Vendor Payable (BS)",  "direction": "Cr", "amount": 12000 },
+          { "account": "Project Cost (P&L)",   "direction": "Dr", "amount": 1000,  "note": "Each month for 12 months" },
+          { "account": "Deferred Cost (BS)",   "direction": "Cr", "amount": 1000,  "note": "Each month for 12 months" }
+        ]
+      },
+      "dependencies": [
+        "Accrual scheme must be defined in General ledger > Setup > Accrual schemes",
+        "Transaction must be posted to a category linked to the scheme",
+        "PMA-001 Post Costs must be ON for the entries to generate"
+      ]
+    },
+    {
+      "id": "PMA-008",
+      "name": "Hour Cost Price Method",
+      "tab": "General",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > General > Cost price — hour",
+      "field_name": "HourCostPriceMethod",
+      "type": "Enum",
+      "options": [
+        "Cost price from worker",
+        "Cost price from project",
+        "Category cost price",
+        "Actual payroll cost"
+      ],
+      "default": "Cost price from worker",
+      "explanation": "Determines which cost rate is used when valuing hour transactions posted to a project. This directly sets the debit amount in the cost journal and therefore the WIP valuation and gross margin calculation.",
+      "accounting_impact": "Controls the cost basis for all labour posted to projects. Incorrect setup leads to WIP mis-statement and distorted project P&L. Actual payroll cost provides highest accuracy but requires payroll integration.",
+      "example_journal": {
+        "trigger": "Worker posts 8 hours; cost price from worker = $75/hr → $600 total",
+        "entries": [
+          { "account": "WIP — Cost Value (BS)",    "direction": "Dr", "amount": 600 },
+          { "account": "Accrued Labour Cost (BS)", "direction": "Cr", "amount": 600 }
+        ]
+      },
+      "dependencies": [
+        "Worker cost prices must be maintained in HR > Workers > Project tab if using 'Cost price from worker'",
+        "Project cost price tables must be populated if using 'Cost price from project'",
+        "PMA-002 WIP account must be configured for the entry to land correctly"
+      ]
+    },
+    {
+      "id": "PMA-009",
+      "name": "Enable WIP for Time and Material Projects",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > Post WIP on account statement",
+      "field_name": "PostWIPOnAccountStatement",
+      "type": "Boolean",
+      "default": false,
+      "explanation": "Extends WIP balance sheet accounting to Time & Material (T&M) project types. By default T&M costs post directly to P&L. Enabling this routes them through a WIP account first, matching cash-basis billing with accrual-basis cost recognition.",
+      "accounting_impact": "OFF (default): T&M costs hit P&L on posting. ON: T&M costs accumulate in WIP (BS) and transfer to COGS only when the customer invoice is finalised. Useful when billing lags significantly behind cost incurrence.",
+      "example_journal": {
+        "trigger": "T&M project: consultant expense $2,000 posted; WIP enabled",
+        "entries_cost_posting": [
+          { "account": "WIP — T&M (BS)",         "direction": "Dr", "amount": 2000 },
+          { "account": "Accrued Costs (BS)",      "direction": "Cr", "amount": 2000 }
+        ],
+        "entries_invoice_posted": [
+          { "account": "Accounts Receivable (BS)", "direction": "Dr", "amount": 2500 },
+          { "account": "Project Revenue (P&L)",    "direction": "Cr", "amount": 2500 },
+          { "account": "Project Cost (P&L)",       "direction": "Dr", "amount": 2000 },
+          { "account": "WIP — T&M (BS)",           "direction": "Cr", "amount": 2000 }
+        ]
+      },
+      "dependencies": [
+        "PMA-001 Post Costs must be ON",
+        "PMA-002 WIP account must be configured (shared with fixed-price WIP or separate account)",
+        "Project group posting profile must permit WIP for T&M project type"
+      ]
+    },
+    {
+      "id": "PMA-010",
+      "name": "Cost Commitment Type",
+      "tab": "Cost control",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Cost control > Committed costs — Purchase order",
+      "field_name": "CommittedCostsPOEnabled",
+      "type": "Boolean",
+      "default": false,
+      "explanation": "When enabled, approved purchase orders linked to a project are treated as committed costs (encumbrances) and reserved against the project budget immediately — before the vendor invoice arrives. Prevents budget overruns caused by in-flight POs.",
+      "accounting_impact": "Does not create a GL posting (memorandum only). Creates a budget reservation that reduces available budget. Actual GL entry is created when the PO product receipt or vendor invoice posts.",
+      "example_journal": {
+        "trigger": "PO raised for $5,000 of project materials (committed); then product receipt confirmed",
+        "commitment": { "note": "No GL entry — budget reservation only (-$5,000 from available budget)" },
+        "product_receipt": [
+          { "account": "WIP / Project Cost (P&L)", "direction": "Dr", "amount": 5000 },
+          { "account": "Accrued Purchases (BS)",   "direction": "Cr", "amount": 5000 }
+        ],
+        "invoice_match": [
+          { "account": "Accrued Purchases (BS)",  "direction": "Dr", "amount": 5000 },
+          { "account": "Accounts Payable (BS)",   "direction": "Cr", "amount": 5000 }
+        ]
+      },
+      "dependencies": [
+        "Project budget must exist (Original budget lines)",
+        "Budget control must be active in General ledger if hard-stop enforcement is needed",
+        "PO must be linked to a project and project category at line level"
+      ]
+    },
+    {
+      "id": "PMA-011",
+      "name": "Revenue Recognition Posting Date",
+      "tab": "General",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > General > Ledger date for estimate posting",
+      "field_name": "EstimatePostingDate",
+      "type": "Enum",
+      "options": [
+        "Project date",
+        "Estimate period end date",
+        "User-specified date"
+      ],
+      "default": "Estimate period end date",
+      "explanation": "Controls which date is stamped on the GL voucher when an estimate (revenue recognition run) is posted. Determines which accounting period the revenue and WIP entries land in — critical for period-end close accuracy.",
+      "accounting_impact": "Misalignment between the estimate date and the reporting period causes revenue to appear in the wrong period. Estimate period end date is the recommended setting for calendar-based closes.",
+      "example_journal": {
+        "trigger": "March estimate run executed on 2 April; period end date = 31 March",
+        "entries": [
+          { "account": "Accrued Revenue (BS)",  "direction": "Dr", "amount": 25000, "posting_date": "31-Mar" },
+          { "account": "Project Revenue (P&L)", "direction": "Cr", "amount": 25000, "posting_date": "31-Mar" }
+        ],
+        "note": "Entry lands in March even though the run was executed in April"
+      },
+      "dependencies": [
+        "PMA-003 and PMA-004 must be active",
+        "Fiscal calendar periods must be open for the target date",
+        "Period-end close process must align estimate run timing with this setting"
+      ]
+    },
+    {
+      "id": "PMA-012",
+      "name": "Invoice Proposal — Sales Tax Charge Method",
+      "tab": "Ledger and tax",
+      "navigation": "Project management and accounting > Setup > Project management and accounting parameters > Ledger and tax > Sales tax on project invoice",
+      "field_name": "SalesTaxChargeMethod",
+      "type": "Enum",
+      "options": [
+        "On account",
+        "On invoice"
+      ],
+      "default": "On invoice",
+      "explanation": "Determines when sales tax is calculated and posted on project invoices: either when an on-account (advance billing) transaction is created, or only when the final invoice is confirmed and posted.",
+      "accounting_impact": "On account: tax liability is recognised at billing milestone (earlier). On invoice: tax liability is recognised at invoice posting (later). Affects timing of tax payable on the BS and compliance with VAT/GST return periods.",
+      "example_journal": {
+        "trigger": "On-account invoice $10,000 + 20% VAT = $12,000",
+        "on_account_method": [
+          { "account": "Customer Advance (BS)",  "direction": "Dr", "amount": 12000 },
+          { "account": "Sales Tax Payable (BS)", "direction": "Cr", "amount": 2000 },
+          { "account": "On-Account Revenue (BS)","direction": "Cr", "amount": 10000 }
+        ]
+      },
+      "dependencies": [
+        "Sales tax groups and item sales tax groups must be assigned to project categories",
+        "Tax authority and settlement periods must be configured in Tax module",
+        "Choice must align with local tax authority reporting requirements"
+      ]
+    }
+  ],
+  "summary_stats": {
+    "total_parameters": 12,
+    "tabs_covered": ["General", "Ledger and tax", "Cost control"],
+    "project_types_impacted": ["Fixed-price", "Time and Material", "Investment"],
+    "highest_risk_parameters": ["PMA-003", "PMA-001", "PMA-004"],
+    "must_configure_before_go_live": ["PMA-001", "PMA-002", "PMA-003", "PMA-004", "PMA-005", "PMA-008"]
+  }
+}
