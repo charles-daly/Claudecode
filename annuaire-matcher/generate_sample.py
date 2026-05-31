@@ -11,13 +11,19 @@ except ImportError:
     print("Run: pip install openpyxl")
     sys.exit(1)
 
+# Columns: SIREN, SIRET, Nom, Adresse, Code postal, Ville, Email
+# Rows intentionally have varying levels of completeness to demo auto-population
 SAMPLE_ROWS = [
-    # Real-looking but fictitious French company data
-    ("356000000", "35600000000048", "Orange SA",          "78 rue Olivier de Serres", "75015", "Paris",    "facturation@orange.fr"),
-    ("542107651", "54210765100015", "Société Générale",   "29 boulevard Haussmann",   "75009", "Paris",    "factures@socgen.com"),
-    ("380129866", "38012986600020", "Carrefour SA",        "93 avenue de Paris",       "91300", "Massy",    "einvoice@carrefour.com"),
-    ("423764738", "",               "Ma PME SARL",         "12 rue du Commerce",       "69002", "Lyon",     ""),
-    ("000000001", "",               "SIREN invalide test", "",                          "",      "",         ""),  # will be skipped
+    # Full data — everything provided, tool will compare all fields
+    ("356000000", "35600000000048", "Orange SA",       "78 rue Olivier de Serres", "75015", "Paris",  "facturation@orange.fr"),
+    # SIRET only, no SIREN — SIREN will be derived from first 9 digits of SIRET
+    ("",          "54210765100015", "",                "",                          "",      "",       ""),
+    # SIREN + name only — code_postal and ville will be populated from annuaire
+    ("380129866", "",               "Carrefour SA",    "",                          "",      "",       "einvoice@carrefour.com"),
+    # SIREN + partial address — ville will be populated
+    ("423764738", "",               "Ma PME SARL",     "12 rue du Commerce",        "69002", "",       ""),
+    # SIREN only — all other fields populated from annuaire
+    ("572073396", "",               "",                "",                          "",      "",       ""),
 ]
 
 HEADERS = ["SIREN", "SIRET", "Nom", "Adresse", "Code postal", "Ville", "Email"]
@@ -28,7 +34,7 @@ ws = wb.active
 ws.title = "Clients"
 
 ws.append(HEADERS)
-for col_idx, _ in enumerate(HEADERS, start=1):
+for col_idx in range(1, len(HEADERS) + 1):
     cell = ws.cell(row=1, column=col_idx)
     cell.fill = FILL_HDR
     cell.font = Font(color="FFFFFF", bold=True)
@@ -40,3 +46,9 @@ for row in SAMPLE_ROWS:
 out = Path("customers_sample.xlsx")
 wb.save(out)
 print(f"Sample file written: {out}")
+print("Row breakdown:")
+print("  Row 2: Full data (all fields)")
+print("  Row 3: SIRET only — SIREN derived automatically")
+print("  Row 4: SIREN + name — address fields populated from annuaire")
+print("  Row 5: SIREN + partial address — ville populated from annuaire")
+print("  Row 6: SIREN only — all other fields populated from annuaire")
